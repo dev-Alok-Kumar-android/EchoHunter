@@ -27,3 +27,5 @@ Thumbs.db
 
 # Misc
 /captures
+
+**/output-metadata.json
