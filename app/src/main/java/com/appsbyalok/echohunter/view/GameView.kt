@@ -15,7 +15,10 @@ import com.appsbyalok.echohunter.R
 import com.appsbyalok.echohunter.data.SaveManager
 import com.appsbyalok.echohunter.data.StoryProtocol
 import com.appsbyalok.echohunter.data.UpgradeSystem
+import com.appsbyalok.echohunter.engine.AppStateId
+import com.appsbyalok.echohunter.engine.DifficultyLevel
 import com.appsbyalok.echohunter.engine.GameEngine
+import com.appsbyalok.echohunter.engine.GameModeId
 import com.appsbyalok.echohunter.engine.GameState
 import com.appsbyalok.echohunter.input.AttackMode
 import com.appsbyalok.echohunter.input.TouchController
@@ -93,7 +96,7 @@ class GameView(context: Context) : View(context) {
 
     internal val onAppClose: () -> Unit = {
         if (navManager.isStackEmpty()) {
-            if (gs.state == 0) {
+            if (gs.state == AppStateId.MENU) {
                 val now = System.currentTimeMillis()
                 if (now - lastExitTapTime < 2000) {
                     (context as? MainActivity)?.finish()
@@ -108,12 +111,12 @@ class GameView(context: Context) : View(context) {
             }
         } else {
             val target = navManager.popPreviousState()
-            if (target == -1 || target == gs.state || (target == 0 && gs.state in 10..17)) disconnectCable()
-            else changeState(target, pushToHistory = false)
+            if (target == null || target == gs.state || (target == AppStateId.MENU && gs.state.isSubMenu)) disconnectCable()
+            else changeState(target!!, pushToHistory = false)
         }
     }
-    internal val onArchiveSelect: (Int) -> Unit = { lvl -> startGame(0, lvl) }
-    internal val onHelpOpen: () -> Unit = { changeState(3) }
+    internal val onArchiveSelect: (Int) -> Unit = { lvl -> startGame(GameModeId.CAMPAIGN, lvl) }
+    internal val onHelpOpen: () -> Unit = { changeState(AppStateId.HELP) }
     internal val onHelpClose: () -> Unit = { onAppClose() }
     internal val onWipeData: () -> Unit = {
         gs.resetGame()
@@ -124,7 +127,7 @@ class GameView(context: Context) : View(context) {
     }
     internal val onDifficultyToggle: () -> Unit = {
         if (SaveManager.isHardModeUnlocked) {
-            gs.difficulty = if (gs.difficulty == 0) 1 else 0
+            gs.difficulty = if (gs.difficulty == DifficultyLevel.NORMAL) DifficultyLevel.HARD else DifficultyLevel.NORMAL
             EchoAudioManager.playSound(ToneGenerator.TONE_PROP_BEEP, 100)
         } else {
             EchoAudioManager.playSound(ToneGenerator.TONE_CDMA_SOFT_ERROR_LITE, 100)
@@ -133,51 +136,51 @@ class GameView(context: Context) : View(context) {
     internal val onMenuRoute: (Int) -> Unit = { route ->
         when (route) {
             0 -> { // 0 = Sandbox -> Campaign Archives
-                gs.gameMode = 0
-                changeState(11)
+                gs.gameMode = GameModeId.CAMPAIGN
+                changeState(AppStateId.ARCHIVES)
             }
             1 -> {
                 // Route 1 now goes to Mainframe/Simulations Hub
                 uiMainFrame.reset()
-                changeState(15) // State 15: UIMainFrame
+                changeState(AppStateId.MAINFRAME) // State 15: UIMainFrame
             }
             2 ->{// 2 = Nano-OS -> OS Menu
-                changeState(14)
+                changeState(AppStateId.NANO_OS)
             }
             151 -> { // Deep link to Act selection details
                 uiMainFrame.openActDetails(0) // Act 1
-                changeState(15)
+                changeState(AppStateId.MAINFRAME)
             }
             100 -> { // 100 = Training Route
-                gs.gameMode = 2 // TrainingMode
-                startGame(2, 1) // Mode 2, Level 1
+                gs.gameMode = GameModeId.TRAINING // TrainingMode
+                startGame(GameModeId.TRAINING, 1) // Mode 2, Level 1
             }
             101 -> { // 101 = Story Route (Act 1)
                 gs.selectedStoryAct = 0
-                startGame(1, 1) // Start at Level 1
+                startGame(GameModeId.STORY, 1) // Start at Level 1
             }
             102 -> { // Act 2
                 gs.selectedStoryAct = 1
-                startGame(1, 16) // Starts from level 16
+                startGame(GameModeId.STORY, 16) // Starts from level 16
             }
             103 -> { // Act 3
                 gs.selectedStoryAct = 2
-                startGame(1, 31) // Starts from level 31
+                startGame(GameModeId.STORY, 31) // Starts from level 31
             }
             104 -> { // Act 1 (Corrupted)
                 gs.selectedStoryAct = 0
-                gs.difficulty = 1
-                startGame(1, 1)
+                gs.difficulty = DifficultyLevel.HARD
+                startGame(GameModeId.STORY, 1)
             }
             105 -> { // Act 2 (Corrupted)
                 gs.selectedStoryAct = 1
-                gs.difficulty = 1
-                startGame(1, 16)
+                gs.difficulty = DifficultyLevel.HARD
+                startGame(GameModeId.STORY, 16)
             }
             106 -> { // Act 3 (Corrupted)
                 gs.selectedStoryAct = 2
-                gs.difficulty = 1
-                startGame(1, 31)
+                gs.difficulty = DifficultyLevel.HARD
+                startGame(GameModeId.STORY, 31)
             }
         }
     }
@@ -206,7 +209,7 @@ class GameView(context: Context) : View(context) {
             currentStoryLines = lines
             storyStep = 0
             gs.nextStateAfterStory = nextState
-            changeState(7)
+            changeState(AppStateId.STORY_MID)
         }
 
         touchController.onPauseClicked = { pauseGame() }
@@ -216,17 +219,17 @@ class GameView(context: Context) : View(context) {
         syncStateToManager()
     }
 
-    fun startGame(mode: Int, level: Int) {
+    fun startGame(mode: GameModeId, level: Int) {
         gs.gameMode = mode
         gs.currentLevel = level
         gs.resetGame()
 
-        if (mode == 0) {
-            SaveManager.incrementLevelAttempts(level, gs.difficulty == 1)
+        if (mode == GameModeId.CAMPAIGN) {
+            SaveManager.incrementLevelAttempts(level, gs.difficulty == DifficultyLevel.HARD)
         }
         
         // Restore persistent combat/loadout preferences after resetGame clears transient state.
-        gs.controls.activeAttackMode = AttackMode.entries.toTypedArray()[SaveManager.activeAttackMode]
+        gs.controls.activeAttackMode = AttackMode.fromInt(SaveManager.activeAttackMode)
         gs.controls.currentWeapon = SaveManager.activeWeapon
         gs.controls.currentTrap = SaveManager.activeTrap
         gs.isAutoPilotActive = SaveManager.isAutoPilotEnabled
@@ -240,13 +243,13 @@ class GameView(context: Context) : View(context) {
         EchoAudioManager.playSound(ToneGenerator.TONE_PROP_BEEP, 50)
 
 
-        if (mode == 1) {
+        if (mode == GameModeId.STORY) {
             currentStoryLines = gs.modeStrategy.getIntroLines()
             storyStep = 0
-            gs.nextStateAfterStory = 1
-            changeState(5, pushToHistory = false)
+            gs.nextStateAfterStory = AppStateId.PLAYING
+            changeState(AppStateId.STORY_INTRO, pushToHistory = false)
         } else {
-            changeState(1, pushToHistory = false)
+            changeState(AppStateId.PLAYING, pushToHistory = false)
         }
     }
 
@@ -254,7 +257,7 @@ class GameView(context: Context) : View(context) {
         clearRunTransientEffects()
         uiMainMenu.disconnect()
         navManager.clearHistory()
-        changeState(0, pushToHistory = false)
+        changeState(AppStateId.MENU, pushToHistory = false)
         EchoAudioManager.playSound(ToneGenerator.TONE_CDMA_ABBR_INTERCEPT, 100)
     }
 
@@ -262,11 +265,11 @@ class GameView(context: Context) : View(context) {
         clearRunTransientEffects()
         
         // Return to Hub (15) if Story/Training, else Archives (11)
-        if (gs.gameMode == 1 || gs.gameMode == 2) {
+        if (gs.gameMode == GameModeId.STORY || gs.gameMode == GameModeId.TRAINING) {
             uiMainFrame.reset()
-            changeState(15, pushToHistory = false)
+            changeState(AppStateId.MAINFRAME, pushToHistory = false)
         } else {
-            changeState(11, pushToHistory = false)
+            changeState(AppStateId.ARCHIVES, pushToHistory = false)
         }
         EchoAudioManager.playSound(ToneGenerator.TONE_CDMA_ABBR_INTERCEPT, 100)
     }
@@ -295,8 +298,8 @@ class GameView(context: Context) : View(context) {
     }
 
     fun pauseGame() {
-        if (gs.state == 1 || gs.state == 8 || gs.state == 9) {
-            changeState(2, pushToHistory = false)
+        if (gs.state.isGameplay) {
+            changeState(AppStateId.PAUSE, pushToHistory = false)
             EchoAudioManager.playSound(ToneGenerator.TONE_PROP_BEEP, 100)
         }
     }
@@ -307,7 +310,7 @@ class GameView(context: Context) : View(context) {
         startGame(cm, cl)
     }
 
-    fun changeState(newState: Int, pushToHistory: Boolean = true) {
+    fun changeState(newState: AppStateId, pushToHistory: Boolean = true) {
         // Safety: Reset touch controller whenever state changes to prevent hardlocked HUD elements
         if (gs.state != newState) {
             if (pushToHistory) navManager.pushCurrentState()
@@ -321,14 +324,13 @@ class GameView(context: Context) : View(context) {
     // --- State Switcher ---
     private fun syncStateToManager() {
         val newStateObj = when (gs.state) {
-            0 -> stateManager.mainMenuState
-            1, 8, 9 -> stateManager.gameplayState
-            2 -> stateManager.pauseState
-            3 -> stateManager.helpState
-            4, 5, 6, 7 -> stateManager.storyState
-            12 -> stateManager.victoryState
-            10, 11, 13, 14, 15, 16, 17 -> stateManager.subMenuState
-            else -> stateManager.mainMenuState
+            AppStateId.MENU -> stateManager.mainMenuState
+            AppStateId.PLAYING, AppStateId.CORE_MERGE, AppStateId.PERFECT_END_ZOOM -> stateManager.gameplayState
+            AppStateId.PAUSE -> stateManager.pauseState
+            AppStateId.HELP -> stateManager.helpState
+            AppStateId.STORY_GAMEOVER, AppStateId.STORY_INTRO, AppStateId.STORY_ENDING, AppStateId.STORY_MID -> stateManager.storyState
+            AppStateId.VICTORY -> stateManager.victoryState
+            AppStateId.DECOMPILER, AppStateId.ARCHIVES, AppStateId.ARSENAL, AppStateId.NANO_OS, AppStateId.MAINFRAME, AppStateId.SETTINGS, AppStateId.TERMINAL -> stateManager.subMenuState
         }
         if (stateManager.currentState != newStateObj) {
             stateManager.changeState(newStateObj)
@@ -336,7 +338,7 @@ class GameView(context: Context) : View(context) {
     }
 
     private fun takeDamage(scale: Float) {
-        if (gs.gameMode == 2 || gs.isLevelCleared) return
+        if (gs.gameMode == GameModeId.TRAINING || gs.isLevelCleared) return
         if (gs.modGodMode && gs.hp <= 1) {
             StoryProtocol.showIngameMessage("MOD: GOD MODE PREVENTED DEATH", 1.5f)
             return
@@ -364,18 +366,18 @@ class GameView(context: Context) : View(context) {
         if (gs.hp <= 0) {
             SaveManager.addData(gs.collectedDataKB)
             SaveManager.saveRunResult(gs.score)
-            if (gs.gameMode == 1) SaveManager.updateStoryStreak(false, gs.difficulty == 1, gs.selectedStoryAct)
+            if (gs.gameMode == GameModeId.STORY) SaveManager.updateStoryStreak(false, gs.difficulty == DifficultyLevel.HARD, gs.selectedStoryAct)
 
             val config = com.appsbyalok.echohunter.data.LevelEngine.getLevelConfig(gs.currentLevel)
             StoryProtocol.isGlitchActive =
                 config.features.contains(com.appsbyalok.echohunter.data.LevelFeature.BOSS) ||
                     config.features.contains(com.appsbyalok.echohunter.data.LevelFeature.ELIMINATION) ||
-                    gs.difficulty == 1
+                    gs.difficulty == DifficultyLevel.HARD
 
             currentStoryLines = StoryProtocol.badEndingLines
             storyStep = 0
-            gs.nextStateAfterStory = 0
-            changeState(4)
+            gs.nextStateAfterStory = AppStateId.MENU
+            changeState(AppStateId.STORY_GAMEOVER)
         }
     }
 
@@ -388,11 +390,11 @@ class GameView(context: Context) : View(context) {
 
     private fun handleCoreUnlock(perfectEnd: Boolean) {
         var finalReward = gs.collectedDataKB
-        if (gs.gameMode == 1) {
-            val currentStreak = if (gs.difficulty == 1) SaveManager.currentHardStreak else SaveManager.currentStoryStreak
+        if (gs.gameMode == GameModeId.STORY) {
+            val currentStreak = if (gs.difficulty == DifficultyLevel.HARD) SaveManager.currentHardStreak else SaveManager.currentStoryStreak
             val mul = when (currentStreak) { 0, 1 -> 1.0; 2 -> 1.25; 3 -> 1.50; else -> 2.0 }
             finalReward = (finalReward * mul).toLong()
-            SaveManager.updateStoryStreak(true, gs.difficulty == 1, gs.selectedStoryAct)
+            SaveManager.updateStoryStreak(true, gs.difficulty == DifficultyLevel.HARD, gs.selectedStoryAct)
 
             if (SaveManager.unlockedStoryStreak >= 3) {
                 StoryProtocol.showIngameMessage("ADMIN: \"TRACE COMPLETED. ENGAGING BLACKOUT.\"", 5f)
@@ -418,7 +420,7 @@ class GameView(context: Context) : View(context) {
             enemySys.ey[i] = -5000f
             enemySys.vis[i] = 0f
         }
-        changeState(8)
+        changeState(AppStateId.CORE_MERGE)
     }
 
     private fun triggerBoss(type: Int, scale: Float) {
@@ -438,11 +440,11 @@ class GameView(context: Context) : View(context) {
             else -> GuardianBossBehavior
         }
         
-        val config = com.appsbyalok.echohunter.data.LevelEngine.getLevelConfig(gs.currentLevel, gs.difficulty)
+        val config = com.appsbyalok.echohunter.data.LevelEngine.getLevelConfig(gs.currentLevel, gs.difficulty.id)
         val bossScaling = com.appsbyalok.echohunter.data.LevelEngine.getSaturatedValue(gs.currentLevel, 0f, 475f, 300f)
 
         // Difficulty-based Boss HP scaling
-        val difficultyHpMult = if (gs.difficulty == 1) 1.2f else 0.7f
+        val difficultyHpMult = if (gs.difficulty == DifficultyLevel.HARD) 1.2f else 0.7f
         gs.bossHp = ((25 + bossScaling) * behavior.baseHpMult * config.hpMultiplier * difficultyHpMult).toInt()
         gs.bossMaxHp = gs.bossHp
         var safeX = gs.px + scale * 1.2f
@@ -653,7 +655,7 @@ class GameView(context: Context) : View(context) {
 
     fun drawTransientOverlays(canvas: Canvas, dt: Float) {
         // Transient effects are run-scoped. Menus must not render a paused game frame.
-        if (gs.state != 1 && gs.state != 8 && gs.state != 9 && gs.state != 12) return
+        if (!gs.state.isGameplay && gs.state != AppStateId.VICTORY) return
 
         if (gs.damageFlash > 0f) {
             canvas.drawColor((gs.damageFlash * 100).toInt() shl 24 or 0xFF0000)
@@ -721,7 +723,7 @@ class GameView(context: Context) : View(context) {
 
     fun handleBackPressed(): Boolean {
         val handled = stateManager.onBackPressed()
-        if (!handled && gs.state == 0) {
+        if (!handled && gs.state == AppStateId.MENU) {
             onAppClose()
             return true
         }

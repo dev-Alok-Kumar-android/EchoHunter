@@ -3,6 +3,7 @@ package com.appsbyalok.echohunter.modes
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
+import com.appsbyalok.echohunter.engine.AppStateId
 import com.appsbyalok.echohunter.engine.GameState
 
 // Interface for Strategy Pattern
@@ -20,7 +21,7 @@ interface GameModeStrategy {
         gs: GameState,
         scale: Float,
         onTriggerBoss: (Int, Float) -> Unit,
-        onSetStory: (IntArray, Int) -> Unit
+        onSetStory: (IntArray, AppStateId) -> Unit
     )
 
     fun getEnemySpawnPosition(gs: GameState, width: Float, height: Float, scale: Float): Pair<Float, Float>

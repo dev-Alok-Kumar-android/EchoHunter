@@ -74,5 +74,6 @@ data class CommandContext(
     val files: Map<String, String>,
     val onAddLines: (String, OutputMode) -> Unit = { _, _ -> },
     val onClear: () -> Unit = {},
+    val onStartGame: (com.appsbyalok.echohunter.engine.GameModeId, Int) -> Unit = { _, _ -> },
     val androidContext: Context
 )

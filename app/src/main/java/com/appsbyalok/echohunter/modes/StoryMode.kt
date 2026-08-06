@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import com.appsbyalok.echohunter.data.SaveManager
 import com.appsbyalok.echohunter.data.StoryProtocol
+import com.appsbyalok.echohunter.engine.AppStateId
 import com.appsbyalok.echohunter.engine.GameState
 import com.appsbyalok.echohunter.systems.updateCameraLogic
 import com.appsbyalok.echohunter.utils.GameColors
@@ -46,7 +47,7 @@ class StoryMode : GameModeStrategy {
 
     override fun checkProgression(
         context: Context, gs: GameState, scale: Float,
-        onTriggerBoss: (Int, Float) -> Unit, onSetStory: (IntArray, Int) -> Unit
+        onTriggerBoss: (Int, Float) -> Unit, onSetStory: (IntArray, AppStateId) -> Unit
     ) {
         // Trigger a boss encounter when the target data requirement is met for the current node
         if (gs.score >= gs.sectorTarget && !gs.bossActive) {
@@ -56,7 +57,7 @@ class StoryMode : GameModeStrategy {
                     onTriggerBoss(0, scale)
                 }
                 2 -> {
-                    onSetStory(StoryProtocol.storyMidLines, 1)
+                    onSetStory(StoryProtocol.storyMidLines, AppStateId.PLAYING)
                     StoryProtocol.showIngameMessage("ADMIN: \"YOU ARE OUT OF YOUR DEPTH. LOCKING NODE 2.\"", 3f)
                     onTriggerBoss(1, scale)
                 }
@@ -78,7 +79,7 @@ class StoryMode : GameModeStrategy {
         // APT (Advanced Persistent Threat) LORE: Admin panics if player is on a 3-win streak
         if (SaveManager.unlockedStoryStreak >= 3 || SaveManager.unlockedHardStreak > 1) {
             // High chance of glitches because the system recognizes the Hacker as an imminent APT threat
-            if (Random.nextDouble() < 0.015) StoryProtocol.triggerRandomGlitch(gs.score, modeId, gs.difficulty)
+            if (Random.nextDouble() < 0.015) StoryProtocol.triggerRandomGlitch(gs.score, modeId, gs.difficulty.id)
 
             // Just before the Omega Guardian on the 4th run, hint at the Blackout Protocol
             if (gs.currentSector == 5 && !gs.bossActive && gs.score >= gs.sectorTarget - 5) {
@@ -89,7 +90,7 @@ class StoryMode : GameModeStrategy {
             }
         } else {
             // Standard glitch rate
-            if (Random.nextDouble() < 0.005) StoryProtocol.triggerRandomGlitch(gs.score, modeId, gs.difficulty)
+            if (Random.nextDouble() < 0.005) StoryProtocol.triggerRandomGlitch(gs.score, modeId, gs.difficulty.id)
         }
     }
 

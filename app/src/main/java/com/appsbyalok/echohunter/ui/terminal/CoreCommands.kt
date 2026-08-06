@@ -4,6 +4,8 @@ import android.os.Handler
 import android.os.Looper
 import com.appsbyalok.echohunter.data.SaveManager
 import com.appsbyalok.echohunter.data.StoryProtocol
+import com.appsbyalok.echohunter.engine.DifficultyLevel
+import com.appsbyalok.echohunter.engine.GameModeId
 import com.appsbyalok.echohunter.engine.GameState
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -393,7 +395,7 @@ class DebugCommand : TerminalCommand {
             }
             "resetall" -> {
                 SaveManager.clearAllData()
-                gs.difficulty = 0 // Force return to Normal Mode
+                gs.difficulty = DifficultyLevel.NORMAL // Force return to Normal Mode
                 "SYSTEM PURGED. ALL DATA AND PROGRESS WIPED."
             }
             else -> "ERR: UNKNOWN DEBUG PARAMETER '$sub'"
@@ -653,19 +655,75 @@ class LevelCommand : TerminalCommand {
     override val name = "START"
     override val description = "Jump to a specific Ring (Level)"
     override val aliases = listOf("GOTO", "LEVEL")
-    override val manual = "USAGE: START [RING_NUMBER]\nDirects the probe to a specific Ring level (1-2147483647). Note: Does not bypass campaign progression locks."
+    override val manual = """
+        USAGE: START [RING_NUMBER] [MODE] [DIFFICULTY]
+        Directs the probe to a specific Ring level and initializes gameplay.
+        
+        MODES: CAMPAIGN (Default), STORY, TRAINING
+        DIFFICULTY: NORMAL (Default), HARD
+        
+        Examples:
+        - START 10
+        - START 5 STORY
+        - START 1 HARD
+    """.trimIndent()
+
     override fun execute(args: List<String>, context: CommandContext): CommandResult {
-        if (args.isEmpty()) return CommandResult("USAGE: START [LEVEL_NUMBER]", OutputMode.INSTANT)
+        if (args.isEmpty()) return CommandResult("USAGE: START [LEVEL_NUMBER] [MODE] [DIFFICULTY]", OutputMode.INSTANT)
         val level = args[0].toIntOrNull() ?: return CommandResult("ERR: INVALID LEVEL NUMBER", OutputMode.INSTANT)
-        
         if (level < 1) return CommandResult("ERR: LEVEL OUT OF RANGE (1-2147483647)", OutputMode.INSTANT)
+
+        val gs = context.gameState
         
-        if (level > SaveManager.maxCampaignLevel && !SaveManager.isHardModeUnlocked) {
-            return CommandResult("ERR: SECTOR RING $level IS LOCKED. CLEAR PREVIOUS RINGS.", OutputMode.INSTANT)
+        // Mode detection
+        var mode = GameModeId.CAMPAIGN
+        if (args.size >= 2) {
+            val modeStr = args[1].uppercase()
+            mode = when (modeStr) {
+                "STORY" -> GameModeId.STORY
+                "TRAINING" -> GameModeId.TRAINING
+                "CAMPAIGN" -> GameModeId.CAMPAIGN
+                else -> {
+                    // Check if 2nd arg is difficulty instead
+                    if (modeStr == "HARD" || modeStr == "NORMAL") mode
+                    else return CommandResult("ERR: UNKNOWN MODE '$modeStr'", OutputMode.INSTANT)
+                }
+            }
+        }
+
+        // Difficulty detection
+        var difficulty = DifficultyLevel.NORMAL
+        for (i in 1 until args.size) {
+            val arg = args[i].uppercase()
+            if (arg == "HARD") difficulty = DifficultyLevel.HARD
+            if (arg == "NORMAL") difficulty = DifficultyLevel.NORMAL
+        }
+
+        // Lock check
+        if (mode == GameModeId.CAMPAIGN && level > SaveManager.maxCampaignLevel && !SaveManager.isHardModeUnlocked) {
+             return CommandResult("ERR: SECTOR RING $level IS LOCKED. CLEAR PREVIOUS RINGS.", OutputMode.INSTANT)
         }
         
-        context.gameState.currentLevel = level
-        return CommandResult("SECTOR LOCKED. RING $level READY FOR INITIALIZATION.", OutputMode.TYPEWRITER)
+        if (mode == GameModeId.STORY && !SaveManager.isStoryModeUnlocked && !SaveManager.isHardModeUnlocked) {
+            return CommandResult("ERR: STORY PROTOCOLS ENCRYPTED. REACH RING 15 TO UNLOCK.", OutputMode.INSTANT)
+        }
+
+        // Apply difficulty
+        gs.difficulty = difficulty
+        
+        // Start Game!
+        context.onStartGame(mode, level)
+        
+        return CommandResult("INITIALIZING RING $level [MODE: $mode] [DIFF: $difficulty]...", OutputMode.TYPEWRITER)
+    }
+
+    override fun getSuggestions(args: List<String>, gs: GameState): List<String> {
+        return when (args.size) {
+            1 -> emptyList() // Level number
+            2 -> listOf("CAMPAIGN", "STORY", "TRAINING", "HARD", "NORMAL").filter { it.startsWith(args[1].uppercase()) }
+            3 -> listOf("HARD", "NORMAL").filter { it.startsWith(args[2].uppercase()) }
+            else -> emptyList()
+        }
     }
 }
 
@@ -734,7 +792,7 @@ class MarketCommand : TerminalCommand {
         )
     }
 
-    inner class MarketSession() : InputHandler {
+    inner class MarketSession : InputHandler {
         override fun getPrompt(): String = "MARKET>"
 
         override fun handleInput(input: String, context: CommandContext): CommandResult {

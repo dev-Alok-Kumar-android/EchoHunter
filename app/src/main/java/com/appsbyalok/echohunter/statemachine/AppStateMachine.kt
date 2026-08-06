@@ -5,6 +5,9 @@ import android.media.ToneGenerator
 import android.view.MotionEvent
 import com.appsbyalok.echohunter.data.SaveManager
 import com.appsbyalok.echohunter.data.StoryProtocol
+import com.appsbyalok.echohunter.engine.AppStateId
+import com.appsbyalok.echohunter.engine.DifficultyLevel
+import com.appsbyalok.echohunter.engine.GameModeId
 import com.appsbyalok.echohunter.engine.GameState
 import com.appsbyalok.echohunter.input.AttackMode
 import com.appsbyalok.echohunter.utils.EchoAudioManager
@@ -120,7 +123,7 @@ class GameplayState(private val manager: AppStateManager) : IAppState {
         val worldZoom = gs.getCameraZoom(width, height)
         if (worldZoom != 1.0f) {
             c.scale(worldZoom, worldZoom)
-        } else if (gs.state == 9) {
+        } else if (gs.state == AppStateId.PERFECT_END_ZOOM) {
             val zoom = 1f + (gs.mergeTimer * 0.5f)
             c.scale(zoom, zoom, gs.coreX - gs.cameraX, gs.coreY - gs.cameraY)
         }
@@ -139,7 +142,7 @@ class GameplayState(private val manager: AppStateManager) : IAppState {
         c.restore()
 
         // --- HUD remains stable (not affected by c.restore() above) ---
-        if (gs.empFlashTimer <= 0.8f && gs.state != 9) manager.view.hudRenderer.drawHUD(c, scale, gs, width, height)
+        if (gs.empFlashTimer <= 0.8f && gs.state != AppStateId.PERFECT_END_ZOOM) manager.view.hudRenderer.drawHUD(c, scale, gs, width, height)
         if (gs.showOverclockTextTimer > 0f) manager.view.hudRenderer.renderOverclockText(c, scale, width, height)
     }
     override fun onTouch(e: MotionEvent, vx: Float, vy: Float, action: Int, gs: GameState, scale: Float, targetW: Float, targetH: Float): Boolean {
@@ -191,27 +194,28 @@ class PauseState(private val manager: AppStateManager) : IAppState {
                 when (hitOnUp) {
                     1 -> {
                         val modes = AttackMode.entries.toTypedArray()
-                        val currentIdx = gs.controls.activeAttackMode.ordinal
+                        val currentIdx = gs.controls.activeAttackMode.id
                         
                         var nextIdx = (currentIdx + 1) % modes.size
                         
                         // Hardware check for Logic Aim modes
-                        for (attempt in 0 until 3) {
-                            val nextMode = modes[nextIdx]
-                            val isLocked = when (nextMode) {
-                                AttackMode.AUTO_AIM -> !SaveManager.isAutoAimUnlocked
-                                AttackMode.MANUAL_AIM -> !SaveManager.isManualAimUnlocked
-                                else -> false
-                            }
-                            
-                            if (!isLocked) break
-                            nextIdx = (nextIdx + 1) % modes.size
+                        fun AttackMode.isLocked(): Boolean = when (this) {
+                            AttackMode.AUTO_AIM -> !SaveManager.isAutoAimUnlocked
+                            AttackMode.MANUAL_AIM -> !SaveManager.isManualAimUnlocked
+                            else -> false
                         }
 
-                        val finalMode = modes[nextIdx]
+                        run search@{
+                            repeat(modes.size) {
+                                if (!modes[nextIdx].isLocked()) return@search
+                                nextIdx = (nextIdx + 1) % modes.size
+                            }
+                        }
+
+                        val finalMode = AttackMode.fromInt(nextIdx)
                         if (finalMode != gs.controls.activeAttackMode) {
                             gs.controls.activeAttackMode = finalMode
-                            SaveManager.setAttackMode(nextIdx)
+                            SaveManager.setAttackMode(finalMode.id)
                             EchoAudioManager.playSound(ToneGenerator.TONE_PROP_BEEP, 100)
                         } else {
                             gs.showGlobalMessage("LOGIC CORE UPGRADE REQUIRED.", 1.2f)
@@ -231,8 +235,8 @@ class PauseState(private val manager: AppStateManager) : IAppState {
                         manager.view.resetGame()
                     }
                     5 -> {
-                        val returnState = if (gs.state == 8 || (gs.coreX > 0f && gs.bossHp <= 0 && gs.gameMode == 1 && gs.currentSector >= 8)) 8 else 1
-                        manager.view.changeState(returnState, pushToHistory = false)
+                        val returnState = if (gs.state == AppStateId.CORE_MERGE || (gs.coreX > 0f && gs.bossHp <= 0 && gs.gameMode == GameModeId.STORY && gs.currentSector >= 8)) AppStateId.CORE_MERGE else AppStateId.PLAYING
+                        manager.view.changeState(returnState)
                         manager.view.lastFrameTime = System.nanoTime()
                     }
                 }
@@ -273,9 +277,9 @@ class VictoryState(private val manager: AppStateManager) : IAppState {
         hitOnDown = -1
     }
     override fun update(dt: Float, gs: GameState, width: Float, height: Float, scale: Float) {
-        if (SaveManager.isAutoNextLevelEnabled && gs.gameMode == 0 && gs.stateTimer > 2.0f) {
+        if (SaveManager.isAutoNextLevelEnabled && gs.gameMode == GameModeId.CAMPAIGN && gs.stateTimer > 2.0f) {
             val nextLevel = if (gs.currentLevel == Int.MAX_VALUE) Int.MAX_VALUE else gs.currentLevel + 1
-            manager.view.startGame(0, nextLevel)
+            manager.view.startGame(GameModeId.CAMPAIGN, nextLevel)
         }
     }
     override fun draw(c: Canvas, gs: GameState, width: Float, height: Float, scale: Float, dt: Float) {
@@ -302,7 +306,7 @@ class VictoryState(private val manager: AppStateManager) : IAppState {
                 if (hitOnUp == 1) {
                     EchoAudioManager.playSound(ToneGenerator.TONE_SUP_CONFIRM, 150)
                     val nextLevel = if (gs.currentLevel == Int.MAX_VALUE) Int.MAX_VALUE else gs.currentLevel + 1
-                    manager.view.startGame(0, nextLevel)
+                    manager.view.startGame(GameModeId.CAMPAIGN, nextLevel)
                     return true
                 } else {
                     manager.view.returnToArchives()
@@ -331,7 +335,7 @@ class StoryCutsceneState(private val manager: AppStateManager) : IAppState {
     }
     override fun draw(c: Canvas, gs: GameState, width: Float, height: Float, scale: Float, dt: Float) {
         c.drawColor(0xFF050A0F.toInt())
-        val lines = if (gs.state == 4) StoryProtocol.badEndingLines else manager.view.currentStoryLines
+        val lines = if (gs.state == AppStateId.STORY_GAMEOVER) StoryProtocol.badEndingLines else manager.view.currentStoryLines
         manager.view.storyStep = manager.view.menuRenderer.drawStory(c, lines, scale, gs, width, height, manager.view.storyStep)
     }
     override fun onTouch(e: MotionEvent, vx: Float, vy: Float, action: Int, gs: GameState, scale: Float, targetW: Float, targetH: Float): Boolean {
@@ -339,7 +343,7 @@ class StoryCutsceneState(private val manager: AppStateManager) : IAppState {
             downY = vy
         }
         if (action == MotionEvent.ACTION_UP) {
-            val activeLines = if (gs.state == 4) StoryProtocol.badEndingLines else manager.view.currentStoryLines
+            val activeLines = if (gs.state == AppStateId.STORY_GAMEOVER) StoryProtocol.badEndingLines else manager.view.currentStoryLines
             
             if (manager.view.storyStep < activeLines.size) {
                 manager.view.storyStep = activeLines.size
@@ -349,16 +353,15 @@ class StoryCutsceneState(private val manager: AppStateManager) : IAppState {
             if (vy > targetH * 0.5f && downY > targetH * 0.5f) {
                 if (gs.stateTimer < 0.5f) return true
                 when (gs.state) {
-                    5, 7 -> {
-                        // Intro or Mid-story -> Start Gameplay
-                        val targetState = if (gs.nextStateAfterStory != -1) gs.nextStateAfterStory else 1
-                        manager.view.changeState(targetState)
+                    AppStateId.STORY_INTRO, AppStateId.STORY_MID -> {
+                        // Transition to the pre-configured next state
+                        manager.view.changeState(gs.nextStateAfterStory)
                     }
-                    6 -> {
+                    AppStateId.STORY_ENDING -> {
                         // Ending -> Save Progress and back to Menu
                         if (gs.isPerfectEnd) {
                             SaveManager.addData(10000) // Perfect Bonus
-                            SaveManager.updateStoryStreak(true, gs.difficulty == 1, gs.selectedStoryAct)
+                            SaveManager.updateStoryStreak(true, gs.difficulty == DifficultyLevel.HARD, gs.selectedStoryAct)
                         } else {
                             SaveManager.addData(2000) // Neutral Bonus
                         }
@@ -372,7 +375,7 @@ class StoryCutsceneState(private val manager: AppStateManager) : IAppState {
         return true
     }
     override fun onBackPressed(gs: GameState): Boolean {
-        if (gs.state == 5 || gs.state == 7) {
+        if (gs.state == AppStateId.STORY_INTRO || gs.state == AppStateId.STORY_MID) {
             manager.view.onAppClose()
             return true
         }
@@ -385,51 +388,52 @@ class SubMenuState(private val manager: AppStateManager) : IAppState {
     override fun onExit(gs: GameState) {}
     override fun update(dt: Float, gs: GameState, width: Float, height: Float, scale: Float) {
         when (gs.state) {
-            16 -> manager.view.uiSettings.update(dt)
+            AppStateId.SETTINGS -> manager.view.uiSettings.update(dt)
             else -> manager.view.uiHelpMenu.update(dt)
         }
     }
     override fun draw(c: Canvas, gs: GameState, width: Float, height: Float, scale: Float, dt: Float) {
         c.drawColor(0xFF050A0F.toInt())
         when (gs.state) {
-            10 -> manager.view.uiDecompiler.draw(c, width, height, scale, dt)
-            11 -> manager.view.uiArchives.draw(c, width, height, gs, scale, dt)
-            13 -> manager.view.uiArsenal.draw(c, width, height, scale, gs)
-            14 -> manager.view.uiNanoOS.draw(c, width, height, scale, gs.timeSinceStart)
-            15 -> manager.view.uiMainFrame.draw(c, width, height, gs, scale, dt)
-            17 -> manager.view.uiTerminal.draw(c, width, height, scale)
-            16 -> manager.view.uiSettings.draw(c, width, height, scale, gs)
+            AppStateId.DECOMPILER -> manager.view.uiDecompiler.draw(c, width, height, scale, dt)
+            AppStateId.ARCHIVES -> manager.view.uiArchives.draw(c, width, height, gs, scale, dt)
+            AppStateId.ARSENAL -> manager.view.uiArsenal.draw(c, width, height, scale, gs)
+            AppStateId.NANO_OS -> manager.view.uiNanoOS.draw(c, width, height, scale, gs.timeSinceStart)
+            AppStateId.MAINFRAME -> manager.view.uiMainFrame.draw(c, width, height, gs, scale, dt)
+            AppStateId.TERMINAL -> manager.view.uiTerminal.draw(c, width, height, scale)
+            AppStateId.SETTINGS -> manager.view.uiSettings.draw(c, width, height, scale, gs)
+            else -> {}
         }
     }
     override fun onTouch(e: MotionEvent, vx: Float, vy: Float, action: Int, gs: GameState, scale: Float, targetW: Float, targetH: Float): Boolean {
         return when (gs.state) {
-            10 -> manager.view.uiDecompiler.onTouch(vx, vy, action, scale, gs, manager.view.onAppClose)
-            11 -> manager.view.uiArchives.onTouch(vx, vy, action,
+            AppStateId.DECOMPILER -> manager.view.uiDecompiler.onTouch(vx, vy, action, scale, gs, manager.view.onAppClose)
+            AppStateId.ARCHIVES -> manager.view.uiArchives.onTouch(vx, vy, action,
                 gs, scale, manager.view.onArchiveSelect, manager.view.onAppClose)
-            13 -> manager.view.uiArsenal.onTouch(vx, vy, action, gs, manager.view.onAppClose)
-            14 -> manager.view.uiNanoOS.onTouch(vx, vy, action, scale, { appIndex ->
+            AppStateId.ARSENAL -> manager.view.uiArsenal.onTouch(vx, vy, action, gs, manager.view.onAppClose)
+            AppStateId.NANO_OS -> manager.view.uiNanoOS.onTouch(vx, vy, action, scale, { appIndex ->
                 when (appIndex) {
-                    0 -> manager.view.changeState(10)
-                    1 -> manager.view.changeState(13)
+                    0 -> manager.view.changeState(AppStateId.DECOMPILER)
+                    1 -> manager.view.changeState(AppStateId.ARSENAL)
                     2 -> {
                         manager.view.uiMainFrame.reset()
-                        manager.view.changeState(15) // State 15: UIMainFrame (Simulation Control)
+                        manager.view.changeState(AppStateId.MAINFRAME)
                     }
-                    3 -> manager.view.changeState(17)
-                    4 -> manager.view.changeState(16)
+                    3 -> manager.view.changeState(AppStateId.TERMINAL)
+                    4 -> manager.view.changeState(AppStateId.SETTINGS)
                 }
             }, manager.view.onDisconnect)
-            15 -> manager.view.uiMainFrame.onTouch(vx, vy, action, scale, gs, { route -> manager.view.onMenuRoute(route) }, { manager.view.onAppClose() })
-            17 -> manager.view.uiTerminal.onTouch(e, scale, gs, manager.view.context, manager.view.onAppClose)
-            16 -> manager.view.uiSettings.onTouch(e, vx, vy, action, scale, targetW, targetH, gs, manager.view.onAppClose, manager.view.onWipeData, manager.view.onOrientationChange) { manager.view.resolveHudLayout() }
+            AppStateId.MAINFRAME -> manager.view.uiMainFrame.onTouch(vx, vy, action, scale, gs, { route -> manager.view.onMenuRoute(route) }, { manager.view.onAppClose() })
+            AppStateId.TERMINAL -> manager.view.uiTerminal.onTouch(e, scale, gs, manager.view.context, manager.view.onAppClose, manager.view::startGame)
+            AppStateId.SETTINGS -> manager.view.uiSettings.onTouch(e, vx, vy, action, scale, targetW, targetH, gs, manager.view.onAppClose, manager.view.onWipeData, manager.view.onOrientationChange) { manager.view.resolveHudLayout() }
             else -> true
         }
     }
     override fun onBackPressed(gs: GameState): Boolean {
-        if (gs.state == 13 && manager.view.uiArsenal.handleBack()) return true
-        if (gs.state == 16 && manager.view.uiSettings.handleBack { manager.view.resolveHudLayout() }) return true
-        if (gs.state == 15 && manager.view.uiMainFrame.handleBackPressed()) return true
-        if (gs.state == 10 || gs.state == 11 || gs.state == 13 || gs.state == 15 || gs.state == 17 || gs.state == 16 || gs.state == 14) {
+        if (gs.state == AppStateId.ARSENAL && manager.view.uiArsenal.handleBack()) return true
+        if (gs.state == AppStateId.SETTINGS && manager.view.uiSettings.handleBack { manager.view.resolveHudLayout() }) return true
+        if (gs.state == AppStateId.MAINFRAME && manager.view.uiMainFrame.handleBackPressed()) return true
+        if (gs.state == AppStateId.DECOMPILER || gs.state == AppStateId.ARCHIVES || gs.state == AppStateId.ARSENAL || gs.state == AppStateId.MAINFRAME || gs.state == AppStateId.TERMINAL || gs.state == AppStateId.SETTINGS || gs.state == AppStateId.NANO_OS) {
             manager.view.onAppClose()
         }
         return true

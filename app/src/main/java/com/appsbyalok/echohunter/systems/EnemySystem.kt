@@ -6,6 +6,8 @@ import android.graphics.Path
 import android.graphics.Typeface
 import com.appsbyalok.echohunter.data.UpgradeSystem
 import com.appsbyalok.echohunter.data.UpgradeType
+import com.appsbyalok.echohunter.engine.DifficultyLevel
+import com.appsbyalok.echohunter.engine.GameModeId
 import com.appsbyalok.echohunter.engine.GameState
 import com.appsbyalok.echohunter.utils.GameColors
 import com.appsbyalok.echohunter.utils.SpawnValidator
@@ -152,7 +154,7 @@ class EnemySystem {
         val isElimination = config.features.contains(com.appsbyalok.echohunter.data.LevelFeature.ELIMINATION)
         val hasDefense = config.features.contains(com.appsbyalok.echohunter.data.LevelFeature.DEFENSE)
 
-        val hunterProb = 0.2f + (gs.difficulty * 0.15f)
+        val hunterProb = 0.2f + (gs.difficulty.id * 0.15f)
 
         // NEW: If it's a Defense level, force BLUE (Kamikaze) enemies for the entire level
         // This ensures red/yellow enemies don't leak in during prep phases or transitions.
@@ -229,7 +231,7 @@ class EnemySystem {
             if (ex[i] < -1000f) continue
 
             // Training targets stay at their briefing position and never attack the player.
-            if (gs.gameMode == 2 && gs.tutorialHighlightedEnemyIndex == i) {
+            if (gs.gameMode == GameModeId.TRAINING && gs.tutorialHighlightedEnemyIndex == i) {
                 evx[i] = 0f
                 evy[i] = 0f
                 vis[i] = 1f
@@ -252,7 +254,7 @@ class EnemySystem {
                     // Search neighboring tiles (N, S, E, W)
                     val dxs = intArrayOf(0, 0, -1, 1)
                     val dys = intArrayOf(-1, 1, 0, 0)
-                    for (dir in 0 until 4) {
+                    for (dir in dxs.indices) {
                         val ncx = (centerCol + dxs[dir]) * ts + ts / 2f
                         val ncy = (centerRow + dys[dir]) * ts + ts / 2f
                         if (!isCollidingWithWall(ncx, ncy, enemyRadius, gs)) {
@@ -394,7 +396,7 @@ class EnemySystem {
 
         // Speed calculation using behavior multiplier
         val baseSpeed = scale * 0.45f * behavior.baseSpeedMult
-        val difficultyMult = if (gs.difficulty == 0) 0.7f else 1.0f
+        val difficultyMult = if (gs.difficulty == DifficultyLevel.NORMAL) 0.7f else 1.0f
         val rageMult = if (gs.isBossRage) 2.0f else 1.0f
         val bSpeed = baseSpeed * difficultyMult * rageMult
 
@@ -474,7 +476,7 @@ class EnemySystem {
                 } else {
                     val dxs = intArrayOf(0, 0, -1, 1)
                     val dys = intArrayOf(-1, 1, 0, 0)
-                    for (dir in 0 until 4) {
+                    for (dir in dxs.indices) {
                         val ncx = (bCol + dxs[dir]) * ts + ts / 2f
                         val ncy = (bRow + dys[dir]) * ts + ts / 2f
                         if (!isCollidingWithWall(ncx, ncy, bossRadius * 0.8f, gs)) {
@@ -511,7 +513,7 @@ class EnemySystem {
     }
 
     fun updatePowerups(dt: Float, gs: GameState, effectSys: EffectSystem, width: Float, height: Float) {
-        val puDropRate = if (gs.difficulty == 0) 0.004f else 0.002f
+        val puDropRate = if (gs.difficulty == DifficultyLevel.NORMAL) 0.004f else 0.002f
         if (Random.nextFloat() < puDropRate * dt * 60f && gs.score > 15 && !gs.bossActive) {
             for (i in 0 until pwn) {
                 if (!pwActive[i]) {
@@ -687,7 +689,7 @@ class EnemySystem {
                     }
                 }
 
-                if (gs.gameMode == 2 && gs.tutorialHighlightedEnemyIndex == i) {
+                if (gs.gameMode == GameModeId.TRAINING && gs.tutorialHighlightedEnemyIndex == i) {
                     p.style = Paint.Style.STROKE
                     p.strokeWidth = scale * 0.006f
                     p.color = GameColors.YELLOW

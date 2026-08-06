@@ -585,7 +585,7 @@ class UITerminal {
         }
     }
 
-    fun onTouch(event: MotionEvent, scale: Float, gs: GameState, context: Context, onExit: () -> Unit): Boolean {
+    fun onTouch(event: MotionEvent, scale: Float, gs: GameState, context: Context, onExit: () -> Unit, onStartGame: (com.appsbyalok.echohunter.engine.GameModeId, Int) -> Unit): Boolean {
         val action = event.actionMasked
         val pointerIndex = event.actionIndex
         val pointerId = event.getPointerId(pointerIndex)
@@ -705,28 +705,28 @@ class UITerminal {
                             "SHIFT" -> {
                                 if (!shiftWasUsedAsModifier) {
                                     EchoAudioManager.playSound(ToneGenerator.TONE_CDMA_PIP, 50)
-                                    handleKeyPress(keyOnUp, gs, context, onExit)
+                                    handleKeyPress(keyOnUp, gs, context, onExit, onStartGame)
                                 }
                                 shiftWasUsedAsModifier = false
                             }
                             "CTRL" -> {
                                 if (!ctrlWasUsedAsModifier) {
                                     EchoAudioManager.playSound(ToneGenerator.TONE_CDMA_PIP, 50)
-                                    handleKeyPress(keyOnUp, gs, context, onExit)
+                                    handleKeyPress(keyOnUp, gs, context, onExit, onStartGame)
                                 }
                                 ctrlWasUsedAsModifier = false
                             }
                             "ALT" -> {
                                 if (!altWasUsedAsModifier) {
                                     EchoAudioManager.playSound(ToneGenerator.TONE_CDMA_PIP, 50)
-                                    handleKeyPress(keyOnUp, gs, context, onExit)
+                                    handleKeyPress(keyOnUp, gs, context, onExit, onStartGame)
                                 }
                                 altWasUsedAsModifier = false
                             }
                             else -> {
                                 if (keyOnUp != "DEL") {
                                     EchoAudioManager.playSound(ToneGenerator.TONE_CDMA_PIP, 50)
-                                    handleKeyPress(keyOnUp, gs, context, onExit)
+                                    handleKeyPress(keyOnUp, gs, context, onExit, onStartGame)
                                 }
                             }
                         }
@@ -744,7 +744,7 @@ class UITerminal {
         return true
     }
 
-    private fun handleKeyPress(key: String, gs: GameState, context: Context, onExit: () -> Unit) {
+    private fun handleKeyPress(key: String, gs: GameState, context: Context, onExit: () -> Unit, onStartGame: (com.appsbyalok.echohunter.engine.GameModeId, Int) -> Unit) {
         if (key != "TAB" && key != "SHIFT" && key != "CTRL" && key != "ALT") {
             autocompleteMatches = emptyList()
             autocompleteIndex = -1
@@ -757,14 +757,14 @@ class UITerminal {
                         commandHistory.add(currentInput)
                     }
                     historyIndex = commandHistory.size
-                    processCommand(currentInput, gs, context, onExit)
+                    processCommand(currentInput, gs, context, onExit, onStartGame)
                     currentInput = ""
                 }
                 isShiftActive = false
                 isCtrlActive = false
                 isAltActive = false
             }
-            "EXIT" -> processCommand("EXIT", gs, context, onExit)
+            "EXIT" -> processCommand("EXIT", gs, context, onExit, onStartGame)
             "HIDE" -> {
                 isKeyboardVisible = false
                 isShiftActive = false
@@ -792,7 +792,7 @@ class UITerminal {
             }
             "CTRL" -> isCtrlActive = !isCtrlActive
             "ALT" -> isAltActive = !isAltActive
-            "SCAN", "DIR", "HELP" -> processCommand(key, gs, context, onExit)
+            "SCAN", "DIR", "HELP" -> processCommand(key, gs, context, onExit, onStartGame)
             "..." -> currentInput += "..."
             else -> {
                 val ctrl = isCtrlActive || activePointers.values.contains("CTRL")
@@ -807,7 +807,7 @@ class UITerminal {
                                 activeSubSession = null
                                 addLines(">> SUB-SESSION TERMINATED. RETURNED TO ROOT.", OutputMode.INSTANT)
                             } else {
-                                processCommand("EXIT", gs, context, onExit)
+                                processCommand("EXIT", gs, context, onExit, onStartGame)
                             }
                         }
                         "P" -> if (commandHistory.isNotEmpty()) {
@@ -983,9 +983,9 @@ class UITerminal {
         } catch (_: ArithmeticException) { "ERR: DIV/0" } catch (_: Exception) { null }
     }
 
-    private fun processCommand(cmd: String, gs: GameState, androidContext: Context, onExit: () -> Unit) {
+    private fun processCommand(cmd: String, gs: GameState, androidContext: Context, onExit: () -> Unit, onStartGame: (com.appsbyalok.echohunter.engine.GameModeId, Int) -> Unit) {
         val promptStr = activeSubSession?.getPrompt() ?: ">"
-        addLines("$promptStr $cmd", OutputMode.INSTANT)
+        addLines("$promptStr $cmd\n", OutputMode.INSTANT)
         
         // Mark terminal as used once any command is processed
         if (!SaveManager.isFirstTerminalUsed && cmd.trim().isNotEmpty()) {
@@ -994,7 +994,7 @@ class UITerminal {
 
         // Logical splitting: & (and/then)
         if (cmd.contains(" & ")) {
-            cmd.split(" & ").forEach { processCommand(it.trim(), gs, androidContext, onExit) }
+            cmd.split(" & ").forEach { processCommand(it.trim(), gs, androidContext, onExit, onStartGame) }
             return
         }
 
@@ -1008,6 +1008,7 @@ class UITerminal {
                 files = files,
                 onAddLines = { t, m -> addLines(t, m) },
                 onClear = { clearScreen() },
+                onStartGame = onStartGame,
                 androidContext = androidContext
             )
             val result = sub.handleInput(cmd, context)
@@ -1047,6 +1048,7 @@ class UITerminal {
                     files = files,
                     onAddLines = { t, m -> addLines(t, m) },
                     onClear = { clearScreen() },
+                    onStartGame = onStartGame,
                     androidContext = androidContext
                 )
                 val result = command.execute(args, context)

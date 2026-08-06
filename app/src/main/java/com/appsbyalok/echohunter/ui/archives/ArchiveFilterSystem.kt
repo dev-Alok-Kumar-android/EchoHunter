@@ -2,10 +2,10 @@ package com.appsbyalok.echohunter.ui.archives
 
 import com.appsbyalok.echohunter.data.LevelFeature
 
-enum class FeatureFilterMode(val label: String) {
-    ANY("OR: ANY"),
-    ALL("AND: ALL"),
-    EXACT("EXACT")
+enum class FeatureFilterMode(val id: Int, val label: String) {
+    ANY(0, "OR: ANY"),
+    ALL(1, "AND: ALL"),
+    EXACT(2, "EXACT")
 }
 
 class ArchiveFilterSystem {

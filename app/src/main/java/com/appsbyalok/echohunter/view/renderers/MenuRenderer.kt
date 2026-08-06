@@ -10,6 +10,7 @@ import android.util.SparseArray
 import com.appsbyalok.echohunter.R
 import com.appsbyalok.echohunter.data.SaveManager
 import com.appsbyalok.echohunter.data.StoryProtocol
+import com.appsbyalok.echohunter.engine.AppStateId
 import com.appsbyalok.echohunter.engine.GameState
 import com.appsbyalok.echohunter.utils.EchoAudioManager
 import com.appsbyalok.echohunter.utils.GameColors
@@ -255,7 +256,7 @@ class MenuRenderer(private val context: Context) {
 
         // Performance Badges
         val noDamage = !gs.tookDamageInLevel
-        val isHard = gs.difficulty == 1
+        val isHard = gs.difficulty == com.appsbyalok.echohunter.engine.DifficultyLevel.HARD
         val badges = mutableListOf<String>()
         if (noDamage) badges.add("NO-DAMAGE")
         if (isHard) badges.add("ELITE-CLEAR")
@@ -326,8 +327,8 @@ class MenuRenderer(private val context: Context) {
         pText.textAlign = Paint.Align.LEFT
         pText.textSize = scale * 0.042f
         val textColor = when (gs.state) {
-            4 -> GameColors.RED
-            6 -> if (lines.contentEquals(StoryProtocol.storyPerfectEnding)) GameColors.YELLOW else GameColors.HP
+            AppStateId.STORY_GAMEOVER -> GameColors.RED
+            AppStateId.STORY_ENDING -> if (lines.contentEquals(StoryProtocol.storyPerfectEnding)) GameColors.YELLOW else GameColors.HP
             else -> GameColors.PULSE
         }
         pText.color = textColor

@@ -23,7 +23,13 @@ object MazeGenerator {
         LABYRINTH       // Complex, tight maze paths for escape objectives
     }
 
-    fun generateLevelMap(level: Int, gameMode: Int, difficulty: Int, seed: Int, storyAct: Int = 0): Array<IntArray> {
+    fun generateLevelMap(
+        level: Int,
+        gameMode: Int,
+        difficulty: Int,
+        seed: Int,
+        storyAct: Int = 0,
+    ): Array<IntArray> {
         val config = LevelEngine.getLevelConfig(level)
         val rand = Random(seed)
 
@@ -41,7 +47,7 @@ object MazeGenerator {
         }
 
         val maxGrid = if (difficulty == 1) 251 else 151
-        
+
         // --- FIX: Use Long for calculation to prevent overflow before min() ---
         val calculatedSize = 21L + (level.toLong() * 2L)
         var w = min(maxGrid.toLong(), calculatedSize).toInt()
@@ -65,10 +71,13 @@ object MazeGenerator {
 
         val grid = Array(w) { IntArray(h) { WALL } }
 
-        var startX = 2; var startY = 2
-        var destX = w - 3; var destY = h - 3
+        var startX = 2
+        var startY = 2
+        var destX = w - 3
+        var destY = h - 3
 
-        val isHybridDefenseEscape = config.features.contains(LevelFeature.ESCAPE) && config.features.contains(LevelFeature.DEFENSE)
+        val isHybridDefenseEscape =
+            config.features.contains(LevelFeature.ESCAPE) && config.features.contains(LevelFeature.DEFENSE)
 
         when (type) {
             MazeType.QUARANTINE -> {
@@ -77,16 +86,19 @@ object MazeGenerator {
                 destX = w / 2; destY = h / 2
                 startX = destX; startY = destY + 2
             }
+
             MazeType.ARENA -> {
                 generateArena(grid, w, h)
                 // BOSS/ARENA layout: Player starts at bottom, objective/boss spawns in center
                 destX = w / 2; destY = h / 2
                 startX = destX; startY = h - 3
             }
+
             MazeType.PILLARS -> {
                 generatePillars(grid, w, h)
                 startX = 2; startY = 2
             }
+
             MazeType.SERVER_FARM -> {
                 val rooms = generateServerFarm(grid, w, h, rand)
                 if (rooms.isNotEmpty()) {
@@ -96,6 +108,7 @@ object MazeGenerator {
                     destY = if (isHybridDefenseEscape) h / 2 else rooms.last().centerY
                 }
             }
+
             MazeType.LABYRINTH -> {
                 generateLabyrinth(grid, w, h, rand)
                 startX = 2; startY = 2
@@ -176,10 +189,10 @@ object MazeGenerator {
         val cw = w / 4
         val ch = h / 4
         // Seal off outer corners with protective bulkheads
-        for(x in 1..cw) for(y in 1..ch) grid[x][y] = WALL
-        for(x in w-1-cw until w-1) for(y in 1..ch) grid[x][y] = WALL
-        for(x in 1..cw) for(y in h-1-ch until h-1) grid[x][y] = WALL
-        for(x in w-1-cw until w-1) for(y in h-1-ch until h-1) grid[x][y] = WALL
+        for (x in 1..cw) for (y in 1..ch) grid[x][y] = WALL
+        for (x in w - 1 - cw until w - 1) for (y in 1..ch) grid[x][y] = WALL
+        for (x in 1..cw) for (y in h - 1 - ch until h - 1) grid[x][y] = WALL
+        for (x in w - 1 - cw until w - 1) for (y in h - 1 - ch until h - 1) grid[x][y] = WALL
     }
 
     private fun generatePillars(grid: Array<IntArray>, w: Int, h: Int) {
@@ -200,7 +213,12 @@ object MazeGenerator {
         val centerY: Int get() = y + h / 2
     }
 
-    private fun generateServerFarm(grid: Array<IntArray>, w: Int, h: Int, rand: Random): List<Room> {
+    private fun generateServerFarm(
+        grid: Array<IntArray>,
+        w: Int,
+        h: Int,
+        rand: Random,
+    ): List<Room> {
         val numRooms = max(3, (w * h) / 100)
         val rooms = mutableListOf<Room>()
 
@@ -219,49 +237,85 @@ object MazeGenerator {
             }
 
             rooms.lastOrNull()?.let { prev ->
-                carveThickCorridor(grid, prev.centerX, prev.centerY, room.centerX, room.centerY, w, h, rand)
+                carveThickCorridor(
+                    grid, prev.centerX, prev.centerY, room.centerX, room.centerY, w, h, rand
+                )
             }
             rooms.add(room)
         }
         return rooms
     }
 
-    private fun carveThickCorridor(grid: Array<IntArray>, x1: Int, y1: Int, x2: Int, y2: Int, w: Int, h: Int, rand: Random) {
+    private fun carveThickCorridor(
+        grid: Array<IntArray>,
+        x1: Int,
+        y1: Int,
+        x2: Int,
+        y2: Int,
+        w: Int,
+        h: Int,
+        rand: Random,
+    ) {
         var cx = x1
         var cy = y1
 
         fun dig(x: Int, y: Int) {
-            for(ox in 0..1) for(oy in 0..1) {
-                if (x+ox in 1 until w-1 && y+oy in 1 until h-1) grid[x+ox][y+oy] = PATH
+            for (ox in 0..1) for (oy in 0..1) {
+                if (x + ox in 1 until w - 1 && y + oy in 1 until h - 1) grid[x + ox][y + oy] = PATH
             }
         }
 
         if (rand.nextBoolean()) {
-            while (cx != x2) { dig(cx, cy); cx += if (x2 > cx) 1 else -1 }
-            while (cy != y2) { dig(cx, cy); cy += if (y2 > cy) 1 else -1 }
+            while (cx != x2) {
+                dig(cx, cy); cx += if (x2 > cx) 1 else -1
+            }
+            while (cy != y2) {
+                dig(cx, cy); cy += if (y2 > cy) 1 else -1
+            }
         } else {
-            while (cy != y2) { dig(cx, cy); cy += if (y2 > cy) 1 else -1 }
-            while (cx != x2) { dig(cx, cy); cx += if (x2 > cx) 1 else -1 }
+            while (cy != y2) {
+                dig(cx, cy); cy += if (y2 > cy) 1 else -1
+            }
+            while (cx != x2) {
+                dig(cx, cy); cx += if (x2 > cx) 1 else -1
+            }
         }
     }
 
     private fun generateLabyrinth(grid: Array<IntArray>, w: Int, h: Int, rand: Random) {
-        fun carve(x: Int, y: Int) {
-            grid[x][y] = PATH
+        val stack = mutableListOf<Pair<Int, Int>>()
+        val start = Pair(2, 2)
+        grid[start.first][start.second] = PATH
+        stack.add(start)
+
+        while (stack.isNotEmpty()) {
+            val current = stack.last()
+            val (x, y) = current
+
             val dirs = mutableListOf(
                 intArrayOf(0, -2), intArrayOf(0, 2), intArrayOf(2, 0), intArrayOf(-2, 0)
             )
             dirs.shuffle(rand)
+
+            var found = false
             for (dir in dirs) {
                 val nx = x + dir[0]
                 val ny = y + dir[1]
                 if (nx in 1 until w - 1 && ny in 1 until h - 1 && grid[nx][ny] == WALL) {
+                    // Remove wall
                     grid[x + dir[0] / 2][y + dir[1] / 2] = PATH
-                    carve(nx, ny)
+                    // Mark visited
+                    grid[nx][ny] = PATH
+                    stack.add(Pair(nx, ny))
+                    found = true
+                    break
                 }
             }
+
+            if (!found) {
+                stack.removeAt(stack.size - 1)
+            }
         }
-        carve(2, 2)
 
         // Inject path loops dynamically to prevent strict, frustrating dead-ends in intense gameplay
         val loopCount = (w * h) / 30
@@ -269,12 +323,14 @@ object MazeGenerator {
         var attempts = 0
         while (loopsMade < loopCount && attempts < loopCount * 5) {
             attempts++
-            val rx = rand.nextInt(2, w-2)
-            val ry = rand.nextInt(2, h-2)
+            val rx = rand.nextInt(2, w - 2)
+            val ry = rand.nextInt(2, h - 2)
             if (grid[rx][ry] == WALL) {
-                val horiz = grid[rx-1][ry] == PATH && grid[rx+1][ry] == PATH && grid[rx][ry-1] == WALL && grid[rx][ry+1] == WALL
-                val vert = grid[rx][ry-1] == PATH && grid[rx][ry+1] == PATH && grid[rx-1][ry] == WALL && grid[rx+1][ry] == WALL
-                if (horiz || vert) {
+                val horizon =
+                    grid[rx - 1][ry] == PATH && grid[rx + 1][ry] == PATH && grid[rx][ry - 1] == WALL && grid[rx][ry + 1] == WALL
+                val vert =
+                    grid[rx][ry - 1] == PATH && grid[rx][ry + 1] == PATH && grid[rx - 1][ry] == WALL && grid[rx + 1][ry] == WALL
+                if (horizon || vert) {
                     grid[rx][ry] = PATH
                     loopsMade++
                 }
@@ -282,14 +338,23 @@ object MazeGenerator {
         }
     }
 
-    private fun placeGuards(grid: Array<IntArray>, w: Int, h: Int, rand: Random, level: Int, px: Int, py: Int) {
+    private fun placeGuards(
+        grid: Array<IntArray>,
+        w: Int,
+        h: Int,
+        rand: Random,
+        level: Int,
+        px: Int,
+        py: Int,
+    ) {
         // Density-based guard placement instead of linear level scaling
         // Linear scaling (level * 2) hits integer limits or becomes unmanageable
         val area = w * h
         val baseGuards = 5
-        val densityFactor = LevelEngine.getSaturatedValue(level, 0.002f, 0.01f, 500f) // 0.2% to 1% of area
+        val densityFactor =
+            LevelEngine.getSaturatedValue(level, 0.002f, 0.01f, 500f) // 0.2% to 1% of area
         val guardCount = (baseGuards + (area * densityFactor)).toInt().coerceAtMost(1000)
-        
+
         var placed = 0
         var attempts = 0
         while (placed < guardCount && attempts < 2000) {
@@ -297,7 +362,7 @@ object MazeGenerator {
             val gx = rand.nextInt(1, w - 1)
             val gy = rand.nextInt(1, h - 1)
 
-            val distSq = (gx - px)*(gx - px) + (gy - py)*(gy - py)
+            val distSq = (gx - px) * (gx - px) + (gy - py) * (gy - py)
 
             // Spawn guards away from the player's immediate starting viewport
             if (grid[gx][gy] == PATH && distSq > 25) {

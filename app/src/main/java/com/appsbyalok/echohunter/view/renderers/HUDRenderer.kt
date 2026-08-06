@@ -9,6 +9,7 @@ import android.graphics.Shader
 import android.graphics.Typeface
 import com.appsbyalok.echohunter.data.SaveManager
 import com.appsbyalok.echohunter.data.StoryProtocol
+import com.appsbyalok.echohunter.engine.GameModeId
 import com.appsbyalok.echohunter.engine.GameState
 import com.appsbyalok.echohunter.input.AttackMode
 import com.appsbyalok.echohunter.input.HudAction
@@ -50,7 +51,7 @@ class HUDRenderer(private val context: Context) {
         // --- 3. MANUAL AIM TOUCHPAD (Visual Boundary) ---
         val manualAimUnlocked = SaveManager.isNodeUnlocked("sys_aim_manual")
         if (manualAimUnlocked && gs.controls.activeAttackMode == AttackMode.MANUAL_AIM &&
-            (gs.gameMode != 2 || HudAction.ATTACK in gs.tutorialEnabledActions)) {
+            (gs.gameMode != GameModeId.TRAINING || HudAction.ATTACK in gs.tutorialEnabledActions)) {
             p.style = Paint.Style.STROKE; p.strokeWidth = scale * 0.001f; p.color = 0x11FF0000
             if (gs.hudLayout.manualAimMode == com.appsbyalok.echohunter.input.MovementMode.STATIC) {
                 c.drawCircle(gs.hudLayout.manualAimX, gs.hudLayout.manualAimY, gs.hudLayout.manualAimRadius, p)
@@ -65,7 +66,7 @@ class HUDRenderer(private val context: Context) {
         var resolvedSonar: ResolvedHudControl? = null
 
         gs.hudLayout.controls.forEach { resolved ->
-            if (gs.gameMode == 2 && resolved.control.action !in gs.tutorialEnabledActions) return@forEach
+            if (gs.gameMode == GameModeId.TRAINING && resolved.control.action !in gs.tutorialEnabledActions) return@forEach
             when (resolved.control.action) {
                 HudAction.ATTACK -> {
                     resolvedAtk = resolved
@@ -85,7 +86,7 @@ class HUDRenderer(private val context: Context) {
         }
 
         // --- 5. RADIAL MENUS (Upper Arc Distribution) ---
-        if (gs.controls.isWeaponMenuOpen && (gs.gameMode != 2 || HudAction.ATTACK in gs.tutorialEnabledActions)) {
+        if (gs.controls.isWeaponMenuOpen && (gs.gameMode != GameModeId.TRAINING || HudAction.ATTACK in gs.tutorialEnabledActions)) {
             if (SaveManager.isNodeUnlocked("sys_carry_w")) {
                 val weapons = SaveManager.unlockedWeapons
                 val labels = weapons.map { id ->
@@ -109,7 +110,7 @@ class HUDRenderer(private val context: Context) {
                     labels, colors, gs.controls.selectedWeaponIdx)
             }
         }
-        if (gs.controls.isTrapMenuOpen && (gs.gameMode != 2 || HudAction.TRAP in gs.tutorialEnabledActions)) {
+        if (gs.controls.isTrapMenuOpen && (gs.gameMode != GameModeId.TRAINING || HudAction.TRAP in gs.tutorialEnabledActions)) {
             if (SaveManager.isNodeUnlocked("sys_carry_t")) {
                 val traps = SaveManager.unlockedTraps
                 val labels = traps.map { id ->
@@ -133,7 +134,7 @@ class HUDRenderer(private val context: Context) {
                     labels, colors, gs.controls.selectedTrapIdx)
             }
         }
-        if (gs.controls.isSonarMenuOpen && (gs.gameMode != 2 || HudAction.SONAR in gs.tutorialEnabledActions)) {
+        if (gs.controls.isSonarMenuOpen && (gs.gameMode != GameModeId.TRAINING || HudAction.SONAR in gs.tutorialEnabledActions)) {
             if (SaveManager.isNodeUnlocked("sys_aim_auto")) {
                 drawRadialMenu(c, scale, resolvedSonar?.x ?: gs.hudLayout.pulseX, resolvedSonar?.y ?: gs.hudLayout.pulseY, arrayOf("MANUAL", "LOCK"), intArrayOf(GameColors.TEXT, GameColors.SHIELD), gs.controls.selectedSonarIdx)
             }

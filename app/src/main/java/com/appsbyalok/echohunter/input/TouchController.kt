@@ -3,6 +3,7 @@ package com.appsbyalok.echohunter.input
 import android.media.ToneGenerator
 import android.view.MotionEvent
 import com.appsbyalok.echohunter.data.StoryProtocol
+import com.appsbyalok.echohunter.engine.GameModeId
 import com.appsbyalok.echohunter.engine.GameState
 import com.appsbyalok.echohunter.utils.EchoAudioManager
 
@@ -26,13 +27,13 @@ class TouchController(private val gs: GameState) {
         when (action) {
             MotionEvent.ACTION_DOWN -> {
                 reset() // Force clear ghost touches on fresh start
-                if (gs.state == 1 || gs.state == 8 || gs.state == 9) onDown(pointerId, vx, vy)
+                if (gs.state.isGameplay) onDown(pointerId, vx, vy)
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
-                if (gs.state == 1 || gs.state == 8 || gs.state == 9) onDown(pointerId, vx, vy)
+                if (gs.state.isGameplay) onDown(pointerId, vx, vy)
             }
             MotionEvent.ACTION_MOVE -> {
-                if (gs.state == 1 || gs.state == 8 || gs.state == 9) onMove(e, offsetX, offsetY)
+                if (gs.state.isGameplay) onMove(e, offsetX, offsetY)
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> onUp(pointerId, action, vx, vy)
             MotionEvent.ACTION_CANCEL -> reset()
@@ -59,13 +60,13 @@ class TouchController(private val gs: GameState) {
     }
 
     private fun onDown(pointerId: Int, x: Float, y: Float) {
-        if (gs.gameMode == 2) {
+        if (gs.gameMode == GameModeId.TRAINING) {
             if (gs.tutorialSkipStepRect.contains(x, y)) return
             if (gs.tutorialSkipAllRect.contains(x, y)) return
         }
         val layout = gs.hudLayout
         layout.controlAt(x, y)?.takeUnless {
-            gs.gameMode == 2 && it.control.action !in gs.tutorialEnabledActions
+            gs.gameMode == GameModeId.TRAINING && it.control.action !in gs.tutorialEnabledActions
         }?.let { resolved ->
             layout.setActionAnchor(resolved)
             when (resolved.control.action) {
@@ -127,7 +128,7 @@ class TouchController(private val gs: GameState) {
             return
         }
 
-        if ((gs.gameMode != 2 || HudAction.ATTACK in gs.tutorialEnabledActions) &&
+        if ((gs.gameMode != GameModeId.TRAINING || HudAction.ATTACK in gs.tutorialEnabledActions) &&
             gs.controls.activeAttackMode == AttackMode.MANUAL_AIM &&
             layout.isManualAimHit(x, y) && gs.touch.manualAimTouchId == -1) {
             gs.touch.manualAimTouchId = pointerId
@@ -169,7 +170,7 @@ class TouchController(private val gs: GameState) {
     }
 
     private fun onUp(pointerId: Int, action: Int, x: Float, y: Float) {
-        if (gs.gameMode == 2) {
+        if (gs.gameMode == GameModeId.TRAINING) {
             if (gs.tutorialSkipStepRect.contains(x, y)) {
                 (gs.activeObjective as? com.appsbyalok.echohunter.modes.TrainingObjective)?.skipStep(gs)
             } else if (gs.tutorialSkipAllRect.contains(x, y)) {

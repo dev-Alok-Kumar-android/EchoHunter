@@ -5,6 +5,8 @@ import com.appsbyalok.echohunter.data.LevelEngine
 import com.appsbyalok.echohunter.data.StoryProtocol
 import com.appsbyalok.echohunter.data.UpgradeSystem
 import com.appsbyalok.echohunter.data.UpgradeType
+import com.appsbyalok.echohunter.engine.AppStateId
+import com.appsbyalok.echohunter.engine.GameModeId
 import com.appsbyalok.echohunter.engine.GameState
 import com.appsbyalok.echohunter.utils.EchoAudioManager
 import com.appsbyalok.echohunter.utils.GameColors
@@ -566,7 +568,7 @@ class CollisionSystem(
 
         // --- NEW: PASSIVE REGEN SYSTEM ---
         val regenInterval = UpgradeSystem.getRegenInterval()
-        if (regenInterval > 0f && gs.hp < gs.maxHp && gs.state == 1) {
+        if (regenInterval > 0f && gs.hp < gs.maxHp && gs.state == AppStateId.PLAYING) {
             gs.regenTimer += 0.016f // Fixed update step assumed
             if (gs.regenTimer >= regenInterval) {
                 gs.hp++
@@ -753,7 +755,7 @@ class CollisionSystem(
         gs.sectorFlash = 1f; gs.shakeAmount = scale * 0.15f
 
         // FIX: Reset score for next sector in Story Mode to maintain challenge
-        if (gs.gameMode == 1) {
+        if (gs.gameMode == GameModeId.STORY) {
             gs.score = 0
         }
 
@@ -780,7 +782,7 @@ class CollisionSystem(
             gs.isLevelCleared = true
         }
 
-        if (gs.gameMode == 1 && gs.currentSector > 5) {
+        if (gs.gameMode == GameModeId.STORY && gs.currentSector > 5) {
             onCoreUnlock(gs.hp == gs.maxHp)
         }
     }

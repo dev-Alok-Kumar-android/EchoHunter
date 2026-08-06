@@ -7,6 +7,7 @@ import com.appsbyalok.echohunter.R
 import com.appsbyalok.echohunter.data.LevelEngine
 import com.appsbyalok.echohunter.data.LevelFeature
 import com.appsbyalok.echohunter.data.StoryProtocol
+import com.appsbyalok.echohunter.engine.AppStateId
 import com.appsbyalok.echohunter.engine.GameState
 import com.appsbyalok.echohunter.systems.updateCameraLogic
 import com.appsbyalok.echohunter.utils.GameColors
@@ -38,7 +39,7 @@ class CampaignMode : GameModeStrategy {
         context: Context,
         gs: GameState, scale: Float,
         onTriggerBoss: (Int, Float) -> Unit,
-        onSetStory: (IntArray, Int) -> Unit
+        onSetStory: (IntArray, AppStateId) -> Unit
     ) {
         if (gs.currentLevel == Int.MAX_VALUE) {
             StoryProtocol.showIngameMessage(R.string.lore_system_overflow, 10f)

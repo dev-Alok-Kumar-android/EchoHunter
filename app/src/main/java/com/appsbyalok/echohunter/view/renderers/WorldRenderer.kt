@@ -8,6 +8,9 @@ import android.graphics.Path
 import android.graphics.Typeface
 import com.appsbyalok.echohunter.R
 import com.appsbyalok.echohunter.data.StoryProtocol
+import com.appsbyalok.echohunter.engine.AppStateId
+import com.appsbyalok.echohunter.engine.DifficultyLevel
+import com.appsbyalok.echohunter.engine.GameModeId
 import com.appsbyalok.echohunter.engine.GameState
 import com.appsbyalok.echohunter.systems.EffectSystem
 import com.appsbyalok.echohunter.systems.EnemySystem
@@ -47,7 +50,7 @@ class WorldRenderer(
         val viewportH = gs.getViewportH(targetW, targetH)
 
         p.style = Paint.Style.STROKE
-        p.color = if (gs.difficulty == 1) 0xFF441010.toInt() else 0xFF1A1C2E.toInt()
+        p.color = if (gs.difficulty == DifficultyLevel.HARD) 0xFF441010.toInt() else 0xFF1A1C2E.toInt()
         p.strokeWidth = max(1f, scale * 0.002f)
         val gap = scale / 8.5f
         val parallaxX = gs.cameraX * 0.5f
@@ -446,12 +449,12 @@ class WorldRenderer(
         // --- FIX: DEFENSE mode, ESCAPE mode or Story Core for all ---
         val config = com.appsbyalok.echohunter.data.LevelEngine.getLevelConfig(gs.currentLevel)
         val isDefense =
-            config.features.contains(com.appsbyalok.echohunter.data.LevelFeature.DEFENSE) && gs.gameMode == 0
+            config.features.contains(com.appsbyalok.echohunter.data.LevelFeature.DEFENSE) && gs.gameMode == GameModeId.CAMPAIGN
         val isEscape =
-            config.features.contains(com.appsbyalok.echohunter.data.LevelFeature.ESCAPE) && gs.gameMode == 0
+            config.features.contains(com.appsbyalok.echohunter.data.LevelFeature.ESCAPE) && gs.gameMode == GameModeId.CAMPAIGN
 
         // Now Escape level also triggers drawCore!
-        if (isDefense || isEscape || gs.state == 8 || gs.state == 9 || (gs.gameMode == 2 && gs.tutorialGateOpen)) {
+        if (isDefense || isEscape || gs.state == AppStateId.CORE_MERGE || gs.state == AppStateId.PERFECT_END_ZOOM || (gs.gameMode == GameModeId.TRAINING && gs.tutorialGateOpen)) {
             drawCore(c, scale, gs, viewportW, screenPlayerX, screenPlayerY)
         }
 
@@ -575,7 +578,7 @@ class WorldRenderer(
         }
 
         // --- FIX: Enemies draw in Gameplay AND Core Merge states ---
-        if (gs.state == 1 || gs.state == 8 || gs.state == 9) enemySys.drawEntities(c, gs, viewportW, scale)
+        if (gs.state.isGameplay) enemySys.drawEntities(c, gs, viewportW, scale)
 
         effectSys.drawTrails(c, gs.cameraX, gs.cameraY, scale, currentPlayerColor)
         effectSys.drawSonarPings(c, gs.cameraX, gs.cameraY, scale)
@@ -673,11 +676,11 @@ class WorldRenderer(
         // --- 1. DETECT LEVEL FEATURES ---
         val config = com.appsbyalok.echohunter.data.LevelEngine.getLevelConfig(gs.currentLevel)
         val isDefense =
-            config.features.contains(com.appsbyalok.echohunter.data.LevelFeature.DEFENSE) && gs.gameMode == 0
-        val isEscape = config.features.contains(com.appsbyalok.echohunter.data.LevelFeature.ESCAPE) && gs.gameMode == 0
+            config.features.contains(com.appsbyalok.echohunter.data.LevelFeature.DEFENSE) && gs.gameMode == GameModeId.CAMPAIGN
+        val isEscape = config.features.contains(com.appsbyalok.echohunter.data.LevelFeature.ESCAPE) && gs.gameMode == GameModeId.CAMPAIGN
 
         // --- 2. SCREEN OFF-BOUNDS ARROW INDICATOR (STORY MODE GATEWAY ONLY) ---
-        if (screenCoreX > targetW - scale * 0.1f && gs.state == 8) {
+        if (screenCoreX > targetW - scale * 0.1f && gs.state == AppStateId.CORE_MERGE) {
             val arrowX = targetW - scale * 0.06f
             val alpha = ((sin(gs.timeSinceStart * 10f) + 1f) / 2f * 155 + 100).toInt()
 
@@ -721,7 +724,7 @@ class WorldRenderer(
 
             when {
                 // A. DEFENSE MODE VISUALS (Purple Pulsing Shield & HP Bar)
-                isDefense && gs.state != 8 -> {
+                isDefense && gs.state != AppStateId.CORE_MERGE -> {
                     // Pulsing Shield Effect around the Core
                     p.style = Paint.Style.STROKE
                     p.strokeWidth = scale * 0.015f
@@ -788,7 +791,7 @@ class WorldRenderer(
                 }
 
                 // B. ESCAPE MODE VISUALS (Exit Portal Portal Logic)
-                (isEscape || (gs.gameMode == 2 && gs.tutorialGateOpen)) && gs.state != 8 -> {
+                (isEscape || (gs.gameMode == GameModeId.TRAINING && gs.tutorialGateOpen)) && gs.state != AppStateId.CORE_MERGE -> {
                     if (gs.escapeGateActive) {
                         // Active Portal (Green Neon Pulse)
                         p.style = Paint.Style.STROKE
@@ -836,7 +839,7 @@ class WorldRenderer(
             }
 
             // --- 5. DOTTED DATA EXTRACTOR TETHER (Story Mode Merges) ---
-            if (gs.state == 8) {
+            if (gs.state == AppStateId.CORE_MERGE) {
                 val dx = screenCoreX - screenPlayerX
                 val dy = screenCoreY - screenPlayerY
                 val dist = sqrt(dx * dx + dy * dy)
@@ -864,7 +867,7 @@ class WorldRenderer(
             shouldDraw = true
         }
         // 1. STORY MODE / BOSS MERGE
-        else if (gs.state == 8) {
+        else if (gs.state == AppStateId.CORE_MERGE) {
             targetX = gs.coreX; targetY = gs.coreY
             arrowColor = GameColors.YELLOW
             shouldDraw = true
@@ -876,13 +879,13 @@ class WorldRenderer(
             shouldDraw = true
         }
         // 3. DEFENSE MODE (Tracks the core)
-        else if (config.features.contains(com.appsbyalok.echohunter.data.LevelFeature.DEFENSE) && gs.gameMode == 0) {
+        else if (config.features.contains(com.appsbyalok.echohunter.data.LevelFeature.DEFENSE) && gs.gameMode == GameModeId.CAMPAIGN) {
             targetX = gs.coreX; targetY = gs.coreY
             arrowColor = GameColors.SHIELD // Neon Purple
             shouldDraw = true
         }
         // 4. ELIMINATION MODE (Tracks the closest Red HVT)
-        else if (config.features.contains(com.appsbyalok.echohunter.data.LevelFeature.ELIMINATION) && gs.gameMode == 0) {
+        else if (config.features.contains(com.appsbyalok.echohunter.data.LevelFeature.ELIMINATION) && gs.gameMode == GameModeId.CAMPAIGN) {
             var minDist = Float.MAX_VALUE
             // Find the closest Type 3 enemy
             for (i in 0 until enemySys.n) {

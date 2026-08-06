@@ -3,6 +3,7 @@ package com.appsbyalok.echohunter
 import com.appsbyalok.echohunter.data.LevelEngine
 import com.appsbyalok.echohunter.data.LevelFeature
 import com.appsbyalok.echohunter.data.MazeGenerator
+import com.appsbyalok.echohunter.engine.GameModeId
 import com.appsbyalok.echohunter.engine.GameState
 import com.appsbyalok.echohunter.modes.BombObjective
 import com.appsbyalok.echohunter.modes.DefenseObjective
@@ -22,7 +23,7 @@ class LevelSimulationTest {
     @Test
     fun testComprehensiveCampaignLevels() {
         val gs = GameState()
-        gs.gameMode = 0 // Campaign
+        gs.gameMode = GameModeId.CAMPAIGN // Campaign
 
         for (level in 1..200) {
             gs.currentLevel = level
@@ -32,13 +33,18 @@ class LevelSimulationTest {
             val objective = gs.activeObjective
 
             // 1. Verify Objective Logic
-            verifyObjectiveMapping(level, config.features, objective)
+            verifyObjectiveMapping(config.features, objective)
 
             // 2. Map Validation
-            val grid = MazeGenerator.generateLevelMap(level, gs.gameMode, gs.difficulty, level)
+            val grid = MazeGenerator.generateLevelMap(level, gs.gameMode.id, gs.difficulty.id, level)
             gs.gridMap = grid
             gs.tileSize = 100f
-            objective.setupObjective(gs, 1080f, 1920f, 1.0f)
+            
+            val enemySys = com.appsbyalok.echohunter.systems.EnemySystem()
+            val effectSys = com.appsbyalok.echohunter.systems.EffectSystem()
+            val spawnerSys = com.appsbyalok.echohunter.systems.SpawnerSystem(enemySys, effectSys)
+            
+            objective.setupObjective(gs, enemySys, spawnerSys, 1080f, 1920f, 1.0f)
 
             // 3. Connectivity Test (BFS)
             assertTrue("L$level: No path from Spawn to Core", isPathPossible(grid))
@@ -65,7 +71,7 @@ class LevelSimulationTest {
     @Test
     fun testStoryModeLogic() {
         val gs = GameState()
-        gs.gameMode = 1 // Story Mode
+        gs.gameMode = GameModeId.STORY // Story Mode
         
         for (act in 0..2) {
             gs.selectedStoryAct = act
@@ -74,18 +80,19 @@ class LevelSimulationTest {
             assertTrue("Story Mode must use StoryObjective", gs.activeObjective is StoryObjective)
             
             // Check if act-specific maze generation works
-            val grid = MazeGenerator.generateLevelMap(1, gs.gameMode, 0, 100, act)
+            val grid = MazeGenerator.generateLevelMap(1, gs.gameMode.id, 0, 100, act)
             assertNotNull("Story Grid null for Act $act", grid)
             assertTrue("Story Act $act grid too small", grid.size > 20)
         }
     }
 
-    private fun verifyObjectiveMapping(level: Int, features: Set<LevelFeature>, objective: IGameObjective) {
+    private fun verifyObjectiveMapping(features: Set<LevelFeature>, objective: IGameObjective) {
         when {
             features.contains(LevelFeature.BOMB) -> assertTrue(objective is BombObjective)
             features.contains(LevelFeature.ESCAPE) -> assertTrue(objective is EscapeObjective)
             features.contains(LevelFeature.DEFENSE) -> assertTrue(objective is DefenseObjective)
             features.contains(LevelFeature.ELIMINATION) -> assertTrue(objective is EliminationObjective)
+            features.contains(LevelFeature.CLEAN_SWEEP) -> assertTrue(objective is com.appsbyalok.echohunter.modes.CleanSweepObjective)
             else -> assertTrue(objective is StandardObjective)
         }
     }
@@ -99,7 +106,7 @@ class LevelSimulationTest {
                 if (grid[x][y] == MazeGenerator.DEST_NODE) end = x to y
             }
         }
-        if (start.first == -1 || end.first == -1) return false
+        if ((start.first == -1) || (end.first == -1)) return false
 
         val q: Queue<Pair<Int, Int>> = LinkedList()
         q.add(start)

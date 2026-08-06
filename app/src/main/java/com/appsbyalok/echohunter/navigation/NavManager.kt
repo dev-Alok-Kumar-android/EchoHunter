@@ -1,6 +1,7 @@
 package com.appsbyalok.echohunter.navigation
 
 import android.os.Bundle
+import com.appsbyalok.echohunter.engine.AppStateId
 import com.appsbyalok.echohunter.engine.GameState
 
 /**
@@ -8,15 +9,15 @@ import com.appsbyalok.echohunter.engine.GameState
  * Prevents navigation traps by tracking the path taken by the user.
  */
 class NavManager(private val gs: GameState) {
-    private val navigationStack = mutableListOf<Int>()
+    private val navigationStack = mutableListOf<AppStateId>()
 
     /**
      * Pushes the current state to history if it's a menu state.
      */
     fun pushCurrentState() {
         val currentState = gs.state
-        // Only track menu states (0: Main, 10-17: Submenus)
-        if (currentState == 0 || currentState in 10..17) {
+        // Only track menu states
+        if (currentState == AppStateId.MENU || currentState.isSubMenu) {
             if (navigationStack.isEmpty() || navigationStack.last() != currentState) {
                 navigationStack.add(currentState)
             }
@@ -24,13 +25,13 @@ class NavManager(private val gs: GameState) {
     }
 
     /**
-     * Returns the previous state from the stack or -1 if empty.
+     * Returns the previous state from the stack or null if empty.
      */
-    fun popPreviousState(): Int {
+    fun popPreviousState(): AppStateId? {
         if (navigationStack.isNotEmpty()) {
             return navigationStack.removeAt(navigationStack.size - 1)
         }
-        return -1
+        return null
     }
 
     /**
@@ -44,7 +45,7 @@ class NavManager(private val gs: GameState) {
      * Saves the navigation stack to a bundle for process death recovery.
      */
     fun saveState(outState: Bundle) {
-        outState.putIntArray("navigationStack", navigationStack.toIntArray())
+        outState.putIntArray("navigationStack", navigationStack.map { it.id }.toIntArray())
     }
 
     /**
@@ -53,7 +54,7 @@ class NavManager(private val gs: GameState) {
     fun restoreState(savedInstanceState: Bundle?) {
         savedInstanceState?.getIntArray("navigationStack")?.let {
             navigationStack.clear()
-            navigationStack.addAll(it.toList())
+            navigationStack.addAll(it.map { id -> AppStateId.fromInt(id) })
         }
     }
 

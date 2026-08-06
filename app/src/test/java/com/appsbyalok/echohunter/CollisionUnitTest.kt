@@ -1,5 +1,6 @@
 package com.appsbyalok.echohunter
 
+import com.appsbyalok.echohunter.engine.GameModeId
 import com.appsbyalok.echohunter.engine.GameState
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -11,7 +12,7 @@ class CollisionUnitTest {
         // 1. Setup GameState
         val gs = GameState()
         gs.tileSize = 100f
-        gs.gameMode = 0 
+        gs.gameMode = GameModeId.CAMPAIGN 
 
         // 2. Create a Mock Grid (0 = Path, 1 = Wall)
         gs.gridMap = arrayOf(
@@ -37,8 +38,7 @@ class CollisionUnitTest {
         val dt = 0.016f
         val scale = 1000f
 
-        // Run movement for 10 frames
-        for (i in 1..10) {
+        repeat(10) {
             gs.updatePlayerMovement(dt, 1080f, 1920f, scale)
         }
 

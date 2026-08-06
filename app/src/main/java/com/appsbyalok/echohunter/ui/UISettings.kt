@@ -290,21 +290,21 @@ class UISettings {
                                 2 -> SaveManager.setEffectsEnabled(!SaveManager.isEffectsEnabled)
                                 3 -> SaveManager.setAutoNextLevel(!SaveManager.isAutoNextLevelEnabled)
                                 4 -> {
-                                    val modes = AttackMode.entries.toTypedArray()
-                                    var nextIdx = (gs.controls.activeAttackMode.ordinal + 1) % modes.size
+                                    val modes = AttackMode.entries
+                                    var nextIdx = (gs.controls.activeAttackMode.id + 1) % modes.size
                                     
                                     // Hardware check for Logic Aim modes
-                                    // Loop at most 3 times to find an unlocked mode
-                                    for (attempt in 0 until 3) {
-                                        val nextMode = modes[nextIdx]
-                                        val isLocked = when (nextMode) {
-                                            AttackMode.AUTO_AIM -> !SaveManager.isAutoAimUnlocked
-                                            AttackMode.MANUAL_AIM -> !SaveManager.isManualAimUnlocked
-                                            else -> false
+                                    fun AttackMode.isLocked(): Boolean = when (this) {
+                                        AttackMode.AUTO_AIM -> !SaveManager.isAutoAimUnlocked
+                                        AttackMode.MANUAL_AIM -> !SaveManager.isManualAimUnlocked
+                                        else -> false
+                                    }
+
+                                    run search@{
+                                        repeat(modes.size) {
+                                            if (!modes[nextIdx].isLocked()) return@search
+                                            nextIdx = (nextIdx + 1) % modes.size
                                         }
-                                        
-                                        if (!isLocked) break
-                                        nextIdx = (nextIdx + 1) % modes.size
                                     }
 
                                     gs.controls.activeAttackMode = modes[nextIdx]

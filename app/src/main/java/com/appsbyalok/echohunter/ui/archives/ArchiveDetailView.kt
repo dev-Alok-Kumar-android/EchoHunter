@@ -254,7 +254,7 @@ class ArchiveDetailView {
         val score = (config.speedMultiplier * 0.3f + config.hpMultiplier * 0.2f + config.spawnRateMultiplier * 0.3f + config.aiIntelligence * 0.2f)
         
         if (lvl % 100 == 0) return "EXTREME"
-        if (mask and (1 shl LevelFeature.BOSS.ordinal) != 0) return "CRITICAL"
+        if (mask and (1 shl LevelFeature.BOSS.id) != 0) return "CRITICAL"
         
         return when {
             score < 1.3f -> "LOW"
@@ -270,9 +270,9 @@ class ArchiveDetailView {
         val config = LevelEngine.getLevelConfig(lvl)
         
         return when {
-            mask and (1 shl LevelFeature.BOSS.ordinal) != 0 -> "HIGH-VALUE TARGET DETECTED. AVOID DIRECT CONFRONTATION WITHOUT FULL CHARGE."
-            mask and (1 shl LevelFeature.DARKNESS.ordinal) != 0 -> "VISUAL SENSORS IMPAIRED. RELY ON SONAR PINGS FOR NAVIGATION."
-            mask and (1 shl LevelFeature.MAZE.ordinal) != 0 -> "COMPLEX GEOMETRY DETECTED. ENTRAPMENT RISK IS NOMINAL."
+            mask and (1 shl LevelFeature.BOSS.id) != 0 -> "HIGH-VALUE TARGET DETECTED. AVOID DIRECT CONFRONTATION WITHOUT FULL CHARGE."
+            mask and (1 shl LevelFeature.DARKNESS.id) != 0 -> "VISUAL SENSORS IMPAIRED. RELY ON SONAR PINGS FOR NAVIGATION."
+            mask and (1 shl LevelFeature.MAZE.id) != 0 -> "COMPLEX GEOMETRY DETECTED. ENTRAPMENT RISK IS NOMINAL."
             config.speedMultiplier > 1.5f -> "HIGH-SPEED HOSTILES DETECTED. OVERCLOCKING RECOMMENDED."
             config.spawnRateMultiplier > 2.0f -> "NUMERICAL DISADVANTAGE CONFIRMED. DEPLOY TRAPS TO CONTROL CROWDS."
             else -> "STANDARD DATA COLLECTION PROTOCOL. MINIMAL RESISTANCE EXPECTED."

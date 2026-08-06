@@ -2,6 +2,8 @@ package com.appsbyalok.echohunter.systems
 
 import com.appsbyalok.echohunter.data.LevelEngine
 import com.appsbyalok.echohunter.data.LevelFeature
+import com.appsbyalok.echohunter.engine.DifficultyLevel
+import com.appsbyalok.echohunter.engine.GameModeId
 import com.appsbyalok.echohunter.engine.GameState
 import com.appsbyalok.echohunter.utils.SpawnValidator
 import kotlin.random.Random
@@ -69,11 +71,11 @@ class SpawnerSystem(private val enemySys: EnemySystem, private val effectSys: Ef
 
         // 2. Second priority: If we don't have enough nodes, procedurally generate the rest
         val config = LevelEngine.getLevelConfig(gs.currentLevel)
-        val isHard = gs.difficulty == 1
+        val isHard = gs.difficulty == DifficultyLevel.HARD
         
         // Use original base nodes but allow feature-based expansion
         val baseNodes = if (isHard) 5f else 4f
-        val bonus = if (gs.gameMode == 1) 4f else 0f
+        val bonus = if (gs.gameMode == GameModeId.STORY) 4f else 0f
         
         // Scale max addition based on level features for more density at higher levels
         var maxAdd = if (isHard) 12f else 8f
@@ -180,7 +182,7 @@ class SpawnerSystem(private val enemySys: EnemySystem, private val effectSys: Ef
         
         // 3. EMERGENCY SAFETY NET: Guaranteed minimums
         // If we still have very few spawners, force some in safe spots (walkable floor)
-        val floorCount = if (gs.difficulty == 1) 10 else 7
+        val floorCount = if (gs.difficulty == DifficultyLevel.HARD) 10 else 7
         val minTarget = kotlin.math.max(floorCount, targetCount / 2)
         
         if (gs.spawnerNodes.size < minTarget && grid != null) {
@@ -537,7 +539,7 @@ class SpawnerSystem(private val enemySys: EnemySystem, private val effectSys: Ef
         // 1.5 FORCE BOSS TRIGGER: If spawners are gone, boss MUST arrive or player gets soft-locked
         // In Story Mode, we force the score to meet the current sector's target.
         if (config.features.contains(LevelFeature.BOSS) && !gs.bossActive) {
-            if (gs.gameMode == 1) {
+            if (gs.gameMode == GameModeId.STORY) {
                 if (gs.score < gs.sectorTarget) {
                     gs.score = gs.sectorTarget.toLong()
                     objectivesCompletedByPurge = true

@@ -24,12 +24,12 @@ import kotlin.math.min
 class GameState {
     var activeObjective: IGameObjective = StandardObjective() // Current goal the player needs to fulfill
     var modeStrategy: GameModeStrategy = CampaignMode() // Logic handler for the active game mode
-    var gameMode = 0 // Identifier for current game mode (0: Campaign/Archives, 1: Story, 2: Training)
+    var gameMode = GameModeId.CAMPAIGN // Identifier for current game mode (Campaign, Story, Training)
         set(value) {
             field = value
             modeStrategy = when (value) {
-                1 -> StoryMode()
-                2 -> TrainingMode()
+                GameModeId.STORY -> StoryMode()
+                GameModeId.TRAINING -> TrainingMode()
                 else -> CampaignMode()
             }
         }
@@ -37,10 +37,10 @@ class GameState {
     var levelStartTime = 0f // Timestamp of when the current level started
     var levelClearTime = 0f // Captured time when level was successfully cleared
 
-    var state = 5 // Current engine state (0: Menu, 1: Playing, 2: Pause, 3: Help, 4: GameOver Story, 5: Intro Story, 6: Ending Story, 7: Mid-story, 8: Core Merge, 9: Perfect End Zoom, 10: Decompiler, 11: Archives, 12: Victory, 13: Arsenal, 14: Nano-OS)
-    var difficulty = 0 // Selected difficulty level (0: Normal/Recruit, 1: Hard/Elite)
+    var state = AppStateId.STORY_INTRO // Start with intro logs
+    var difficulty = DifficultyLevel.NORMAL // Selected difficulty level (Normal, Hard)
     var stateTimer = 0f // General timer for state-specific durations
-    var nextStateAfterStory = 0 // Target state to transition to after a story sequence
+    var nextStateAfterStory = AppStateId.MENU // After intro logs, go to Menu
     var timeSinceStart = 0f // Total elapsed time since the game session began
 
     var selectedStoryAct = 0 // Index of the currently selected story chapter
@@ -149,7 +149,7 @@ class GameState {
 
     // --- DARKNESS LOGIC ---
     val isDarknessLevel: Boolean get() {
-        if (gameMode == 1) return false // in Story mode full visibility also
+        if (gameMode == GameModeId.STORY) return false // in Story mode full visibility also
         val config = LevelEngine.getLevelConfig(currentLevel)
         return config.features.contains(LevelFeature.DARKNESS)
     }
@@ -175,7 +175,7 @@ class GameState {
         set(value) {
             if (value && !field) {
                 winDelayTimer = 1.5f // Delay victory screen to let the player see the final moment
-                if (gameMode != 1) slowMoTimer = 2.0f // Cinematic slow-mo for non-story modes
+                if (gameMode != GameModeId.STORY) slowMoTimer = 2.0f // Cinematic slow-mo for non-story modes
                 whiteFlash = 0.5f    // Screen flash on win
                 sectorFlash = 0.6f   // Greenish system success flash
                 chromaticIntensity = 1.2f 
@@ -320,12 +320,12 @@ class GameState {
     var fadeMultiplier = 1f // Overall ambient darkness factor applied to the scene
 
     fun saveState(b: Bundle) {
-        b.putInt("state", state)
-        b.putInt("difficulty", difficulty)
+        b.putInt("state", state.id)
+        b.putInt("difficulty", difficulty.id)
         b.putLong("score", score)
-        b.putInt("gameMode", gameMode)
+        b.putInt("gameMode", gameMode.id)
         b.putInt("hp", hp)
-        b.putInt("nextStateAfterStory", nextStateAfterStory)
+        b.putInt("nextStateAfterStory", nextStateAfterStory.id)
         b.putFloat("timeSinceStart", timeSinceStart)
         b.putInt("currentSector", currentSector)
         b.putInt("sectorTarget", sectorTarget)
@@ -350,12 +350,12 @@ class GameState {
     }
 
     fun restoreState(b: Bundle) {
-        state = b.getInt("state", 5)
-        difficulty = b.getInt("difficulty", 0)
+        state = AppStateId.fromInt(b.getInt("state", AppStateId.STORY_INTRO.id))
+        difficulty = DifficultyLevel.fromInt(b.getInt("difficulty", DifficultyLevel.NORMAL.id))
         score = b.getLong("score", 0)
-        gameMode = b.getInt("gameMode", 0)
+        gameMode = GameModeId.fromInt(b.getInt("gameMode", GameModeId.CAMPAIGN.id))
         hp = b.getInt("hp", 3)
-        nextStateAfterStory = b.getInt("nextStateAfterStory", 0)
+        nextStateAfterStory = AppStateId.fromInt(b.getInt("nextStateAfterStory", AppStateId.MENU.id))
         timeSinceStart = b.getFloat("timeSinceStart", 0f)
         currentSector = b.getInt("currentSector", 1)
         sectorTarget = b.getInt("sectorTarget", 30)
@@ -417,8 +417,8 @@ class GameState {
 
         val config = LevelEngine.getLevelConfig(currentLevel)
         activeObjective = when {
-            gameMode == 2 -> com.appsbyalok.echohunter.modes.TrainingObjective()
-            gameMode == 1 -> com.appsbyalok.echohunter.modes.StoryObjective()
+            gameMode == GameModeId.TRAINING -> com.appsbyalok.echohunter.modes.TrainingObjective()
+            gameMode == GameModeId.STORY -> com.appsbyalok.echohunter.modes.StoryObjective()
             config.features.contains(LevelFeature.BOMB) -> com.appsbyalok.echohunter.modes.BombObjective()
             config.features.contains(LevelFeature.ESCAPE) -> com.appsbyalok.echohunter.modes.EscapeObjective()
             config.features.contains(LevelFeature.DEFENSE) -> com.appsbyalok.echohunter.modes.DefenseObjective()
@@ -517,7 +517,7 @@ class GameState {
 
         // --- PASSIVE REGEN LOGIC ---
         val regenInterval = UpgradeSystem.getRegenInterval()
-        if (regenInterval > 0f && hp < maxHp && state == 1) {
+        if (regenInterval > 0f && hp < maxHp && state == AppStateId.PLAYING) {
             regenTimer += dt
             if (regenTimer >= regenInterval) {
                 hp = min(maxHp, hp + 1)
@@ -528,7 +528,7 @@ class GameState {
         }
 
         // --- COMBO DECAY LOGIC ---
-        if (combo > 0 && comboBreakTimer <= 0f && state == 1) {
+        if (combo > 0 && comboBreakTimer <= 0f && state == AppStateId.PLAYING) {
             // Decays combo slowly if not in action, but doesn't drop to 0 instantly if it's very high
             if (combo > 50) combo -= 1 else combo = 0
             
@@ -539,7 +539,7 @@ class GameState {
         if (showOverclockTextTimer > 0f) showOverclockTextTimer -= dt
         if (comboBreakTimer > 0f) comboBreakTimer -= dt
         if (shieldTimer > 0f) shieldTimer -= dt
-        if (shieldTimer <= 0f && playerIframe <= 0f && state == 1) {
+        if (shieldTimer <= 0f && playerIframe <= 0f && state == AppStateId.PLAYING) {
             shieldRechargeTimer += dt
             val targetTime = 5f * UpgradeSystem.getShieldRecoveryMultiplier()
             if (shieldRechargeTimer >= targetTime) {
@@ -553,19 +553,19 @@ class GameState {
         if (cooldownTimer > 0f) cooldownTimer -= dt
         if (empFlashTimer > 0f) empFlashTimer -= dt
         if (slowMoTimer > 0f) slowMoTimer -= dt
-        if (whiteFlash > 0f && state != 9) whiteFlash = max(0f, whiteFlash - dt)
+        if (whiteFlash > 0f && state != AppStateId.PERFECT_END_ZOOM) whiteFlash = max(0f, whiteFlash - dt)
         if (bossDeathTimer > 0f) bossDeathTimer -= dt
         if (bossLockTimer > 0f) bossLockTimer -= dt
         if (attackCooldown > 0f) attackCooldown -= dt
         if (sonarTimer > 0f) sonarTimer -= dt
         if (winDelayTimer > 0f) winDelayTimer -= dt
         if (shakeAmount > 0f) {
-            if (state == 12) shakeAmount = 0f // Stop shaking in Victory state
+            if (state == AppStateId.VICTORY) shakeAmount = 0f // Stop shaking in Victory state
             else shakeAmount -= dt * scale * 0.5f
         }
 
         val target = targetClarity
-        val visionUpdateRate = if (difficulty == 1) 0.04f else 0.8f
+        val visionUpdateRate = if (difficulty == DifficultyLevel.HARD) 0.04f else 0.8f
         if (visionClarity < target) {
             visionClarity = min(target, visionClarity + dt * visionUpdateRate)
         } else if (visionClarity > target) {
@@ -584,7 +584,7 @@ class GameState {
             overclockMeter = (overclockTimer / maxOcTime) * 100f
             if (overclockTimer <= 0f) EchoAudioManager.playSound(ToneGenerator.TONE_CDMA_PIP, 100)
         } else if (overclockMeter > 0f && overclockMeter < 100f) {
-            val drainSpeed = if (difficulty == 0) 5f else 10f
+            val drainSpeed = if (difficulty == DifficultyLevel.NORMAL) 5f else 10f
             val patchMult = if (UpgradeSystem.hasOverclockRegenPatch()) 1.25f else 1.0f
             overclockMeter = max(0f, overclockMeter - drainSpeed * dt * patchMult)
         }
@@ -683,7 +683,7 @@ class GameState {
 
         // Fade multiplier (Background darkness intensity)
         fadeMultiplier = if (modFullVisibility || !applyDarkness) 1.0f else {
-            val baseFade = if (difficulty == 1) 0.75f else 0.85f
+            val baseFade = if (difficulty == DifficultyLevel.HARD) 0.75f else 0.85f
             min(0.99f, baseFade + 0.15f * visionClarity)
         }
 

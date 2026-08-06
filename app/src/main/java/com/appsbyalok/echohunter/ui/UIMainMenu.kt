@@ -14,6 +14,8 @@ import android.view.View
 import com.appsbyalok.echohunter.R
 import com.appsbyalok.echohunter.data.SaveManager
 import com.appsbyalok.echohunter.data.StoryProtocol
+import com.appsbyalok.echohunter.engine.AppStateId
+import com.appsbyalok.echohunter.engine.DifficultyLevel
 import com.appsbyalok.echohunter.engine.GameState
 import com.appsbyalok.echohunter.systems.EffectSystem
 import com.appsbyalok.echohunter.utils.EchoAudioManager
@@ -152,7 +154,7 @@ class UIMainMenu(private val context: Context) {
 
                     if (isSwitchOn) {
                         view.postDelayed({
-                            if (isSwitchOn && connectedMode != -1 && gs.state == 0) {
+                            if (isSwitchOn && connectedMode != -1 && gs.state == AppStateId.MENU) {
                                 onRouteConnection(connectedMode)
                             }
                         }, 250)
@@ -198,13 +200,13 @@ class UIMainMenu(private val context: Context) {
         )
 
         if (SaveManager.isHardModeUnlocked) {
-            pText.color = if (gs.difficulty == 0) GameColors.TEXT else GameColors.RED
+            pText.color = if (gs.difficulty == DifficultyLevel.NORMAL) GameColors.TEXT else GameColors.RED
             pText.textAlign = Paint.Align.LEFT; pText.textSize = scale * 0.045f
             pText.setShadowLayer(
-                15f, 0f, 0f, (if (gs.difficulty == 0) GameColors.PULSE else GameColors.RED)
+                15f, 0f, 0f, (if (gs.difficulty == DifficultyLevel.NORMAL) GameColors.PULSE else GameColors.RED)
             )
             val modeText =
-                getCachedString(if (gs.difficulty == 0) R.string.ui_mode_easy else R.string.ui_mode_hard)
+                getCachedString(if (gs.difficulty == DifficultyLevel.NORMAL) R.string.ui_mode_easy else R.string.ui_mode_hard)
             c.drawText(modeText, scale * 0.05f, targetH - scale * 0.05f, pText)
             pText.clearShadowLayer()
 
@@ -728,7 +730,7 @@ class UIMainMenu(private val context: Context) {
 
                         if (isSwitchOn && connectedMode != -1) {
                             view.postDelayed({
-                                if (isSwitchOn && connectedMode != -1 && gs.state == 0) {
+                                if (isSwitchOn && connectedMode != -1 && gs.state == AppStateId.MENU) {
                                     onRouteConnection(connectedMode)
                                 }
                             }, 250)

@@ -4,6 +4,8 @@ import android.media.ToneGenerator
 import com.appsbyalok.echohunter.data.LevelEngine
 import com.appsbyalok.echohunter.data.LevelFeature
 import com.appsbyalok.echohunter.data.StoryProtocol
+import com.appsbyalok.echohunter.engine.AppStateId
+import com.appsbyalok.echohunter.engine.DifficultyLevel
 import com.appsbyalok.echohunter.engine.GameState
 import com.appsbyalok.echohunter.systems.EnemySystem
 import com.appsbyalok.echohunter.systems.SpawnerSystem
@@ -84,7 +86,7 @@ class StandardObjective : IGameObjective {
         if (trickleTimer <= 0f) {
             var activeCount = 0
             for (i in 0 until enemySys.n) if (enemySys.ex[i] > -1000f) activeCount++
-            val baseLimit = if (gs.difficulty == 1) 18f else 14f
+            val baseLimit = if (gs.difficulty == DifficultyLevel.HARD) 18f else 14f
             val limit = LevelEngine.getSaturatedValue(gs.currentLevel, baseLimit, 40f - baseLimit, 100f).toInt()
             val queued = spawnerSys.getTotalQueue(gs)
             if (activeCount + queued < limit) {
@@ -170,7 +172,7 @@ class DefenseObjective : IGameObjective {
             gs.objectiveLabel = "UPLINK SECURED - PURGING..."
         }
 
-        val waveTotal = 2f * (if (gs.difficulty == 1) 1.5f else 1.0f)
+        val waveTotal = 2f * (if (gs.difficulty == DifficultyLevel.HARD) 1.5f else 1.0f)
         val expectedTotal = LevelEngine.getSaturatedValue(gs.currentLevel, waveTotal, 40f - waveTotal, 80f).toInt()
         val currentRemaining = gs.defEnemiesToSpawn + gs.defEnemiesAlive
         gs.objectiveProgress = if (expectedTotal > 0 && gs.defWaveState == 1) {
@@ -186,7 +188,7 @@ class DefenseObjective : IGameObjective {
             if (trickleTimer <= 0f) {
                 var activeCount = 0
                 for (i in 0 until enemySys.n) if (enemySys.ex[i] > -1000f) activeCount++
-                val baseLimit = if (gs.difficulty == 1) 16f else 12f
+                val baseLimit = if (gs.difficulty == DifficultyLevel.HARD) 16f else 12f
                 val limit = LevelEngine.getSaturatedValue(gs.currentLevel, baseLimit, 35f - baseLimit, 120f).toInt()
                 val queued = spawnerSys.getTotalQueue(gs)
                 if (activeCount + queued < limit) {
@@ -201,8 +203,8 @@ class DefenseObjective : IGameObjective {
                 gs.defWaveTimer -= dt
                 if (gs.defWaveTimer <= 0f) {
                     gs.defWaveState = 1
-                    val diffMult = if (gs.difficulty == 1) 1.5f else 1.0f
-                    val hardCap = if (gs.difficulty == 1) 40f else 25f
+                    val diffMult = if (gs.difficulty == DifficultyLevel.HARD) 1.5f else 1.0f
+                    val hardCap = if (gs.difficulty == DifficultyLevel.HARD) 40f else 25f
                     val baseCount = 2f * diffMult
 
                     gs.defEnemiesToSpawn = LevelEngine.getSaturatedValue(gs.currentLevel, baseCount, hardCap - baseCount, 80f).toInt()
@@ -329,7 +331,7 @@ class EscapeObjective : IGameObjective {
             } else if (hasDefense && gs.defWaveCurrent <= gs.defWaveMax) {
                 gs.objectiveLabel = "$prefix | WAVE ${gs.defWaveCurrent}/${gs.defWaveMax}"
                 // PROGRESS: Ratio of enemies killed in current wave
-                val waveTotal = 6f * (if (gs.difficulty == 1) 1.5f else 1.0f)
+                val waveTotal = 6f * (if (gs.difficulty == DifficultyLevel.HARD) 1.5f else 1.0f)
                 val expectedTotal = LevelEngine.getSaturatedValue(gs.currentLevel, waveTotal, 22f, 100f).toInt()
 
                 val currentRemaining = gs.defEnemiesToSpawn + gs.defEnemiesAlive
@@ -355,7 +357,7 @@ class EscapeObjective : IGameObjective {
 
             var activeCount = 0
             for (i in 0 until enemySys.n) if (enemySys.ex[i] > -1000f) activeCount++
-            val baseLimit = if (gs.difficulty == 1) 16f else 12f
+            val baseLimit = if (gs.difficulty == DifficultyLevel.HARD) 16f else 12f
             val limit = LevelEngine.getSaturatedValue(gs.currentLevel, baseLimit, 35f - baseLimit, 120f).toInt()
             val queued = spawnerSys.getTotalQueue(gs)
 
@@ -447,7 +449,7 @@ class EscapeObjective : IGameObjective {
                 gs.defWaveTimer -= dt
                 if (gs.defWaveTimer <= 0f) {
                     gs.defWaveState = 1
-                    val diffMult = if (gs.difficulty == 1) 1.5f else 1.0f
+                    val diffMult = if (gs.difficulty == DifficultyLevel.HARD) 1.5f else 1.0f
                     val baseCount = 6f * diffMult
                     val count = LevelEngine.getSaturatedValue(gs.currentLevel, baseCount, 22f, 100f).toInt()
 
@@ -525,7 +527,7 @@ class StoryObjective : IGameObjective {
         if (trickleTimer <= 0f) {
             var activeCount = 0
             for (i in 0 until enemySys.n) if (enemySys.ex[i] > -1000f) activeCount++
-            val baseLimit = if (gs.difficulty == 1) 20 else 15
+            val baseLimit = if (gs.difficulty == DifficultyLevel.HARD) 20 else 15
             val limit = kotlin.math.min(45, baseLimit + (gs.currentSector * 5))
             val queued = spawnerSys.getTotalQueue(gs)
             if (activeCount + queued < limit) {
@@ -536,14 +538,14 @@ class StoryObjective : IGameObjective {
         
         // Final Boss Kill logic in Story Mode: If boss was active and now dead
         // And we are past the final sector, activate the central core (State 8)
-        if (gs.currentSector > 5 && gs.state == 1) {
-            gs.state = 8
+        if (gs.currentSector > 5 && gs.state == AppStateId.PLAYING) {
+            gs.state = AppStateId.CORE_MERGE
             gs.coreRadius = 100f
             StoryProtocol.showIngameMessage("MAINFRAME COMPROMISED. ACCESSING CENTRAL CORE...", 5f)
             EchoAudioManager.playSound(ToneGenerator.TONE_CDMA_HIGH_L, 1000)
         }
 
-        if (gs.state == 8 && gs.coreRadius == 0f) gs.coreRadius = 100f
+        if (gs.state == AppStateId.CORE_MERGE && gs.coreRadius == 0f) gs.coreRadius = 100f
     }
     
     override fun checkWinCondition(gs: GameState): Boolean {
@@ -656,7 +658,7 @@ class EliminationObjective : IGameObjective {
         if (trickleTimer <= 0f) {
             var activeCount = 0
             for (i in 0 until enemySys.n) if (enemySys.ex[i] > -1000f) activeCount++
-            val baseLimit = if (gs.difficulty == 1) 18f else 14f
+            val baseLimit = if (gs.difficulty == DifficultyLevel.HARD) 18f else 14f
             val limit = LevelEngine.getSaturatedValue(gs.currentLevel, baseLimit, 40f - baseLimit, 100f).toInt()
             val queued = spawnerSys.getTotalQueue(gs)
             if (activeCount + queued < limit) {
@@ -763,7 +765,7 @@ class BombObjective : IGameObjective {
         if (trickleTimer <= 0f) {
             var activeCount = 0
             for (i in 0 until enemySys.n) if (enemySys.ex[i] > -1000f) activeCount++
-            val baseLimit = if (gs.difficulty == 1) 20f else 15f
+            val baseLimit = if (gs.difficulty == DifficultyLevel.HARD) 20f else 15f
             val limit = LevelEngine.getSaturatedValue(gs.currentLevel, baseLimit, 45f - baseLimit, 100f).toInt()
             val queued = spawnerSys.getTotalQueue(gs)
             if (activeCount + queued < limit) {
@@ -807,7 +809,7 @@ class CleanSweepObjective : IGameObjective {
         if (trickleTimer <= 0f) {
             var activeCount = 0
             for (i in 0 until enemySys.n) if (enemySys.ex[i] > -1000f) activeCount++
-            val baseLimit = if (gs.difficulty == 1) 22f else 18f
+            val baseLimit = if (gs.difficulty == DifficultyLevel.HARD) 22f else 18f
             val limit = LevelEngine.getSaturatedValue(gs.currentLevel, baseLimit, 45f - baseLimit, 100f).toInt()
             val queued = spawnerSys.getTotalQueue(gs)
             if (activeCount + queued < limit) {

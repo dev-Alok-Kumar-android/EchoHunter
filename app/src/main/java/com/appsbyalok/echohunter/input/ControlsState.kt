@@ -1,9 +1,14 @@
 package com.appsbyalok.echohunter.input
 
-enum class AttackMode {
-    DIRECTIONAL, // Manual: Face direction (Classic)
-    AUTO_AIM,    // Nearest enemy
-    MANUAL_AIM   // Joystick / Free Aim
+enum class AttackMode(val id: Int) {
+    DIRECTIONAL(0), // Manual: Face direction (Classic)
+    AUTO_AIM(1),    // Nearest enemy
+    MANUAL_AIM(2);  // Joystick / Free Aim
+
+    companion object {
+        private val map = entries.associateBy(AttackMode::id)
+        fun fromInt(id: Int): AttackMode = map[id] ?: DIRECTIONAL
+    }
 }
 
 class ControlsState {

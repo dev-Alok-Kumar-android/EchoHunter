@@ -3,6 +3,8 @@ package com.appsbyalok.echohunter
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.appsbyalok.echohunter.data.MazeGenerator
+import com.appsbyalok.echohunter.engine.DifficultyLevel
+import com.appsbyalok.echohunter.engine.GameModeId
 import com.appsbyalok.echohunter.engine.GameState
 import com.appsbyalok.echohunter.modes.StandardObjective
 import com.appsbyalok.echohunter.systems.EffectSystem
@@ -25,14 +27,14 @@ class SpawnerDensityTest {
         for (level in levelsToTest) {
             val gs = GameState()
             gs.currentLevel = level
-            gs.difficulty = 1 // Hard mode for max spawners
-            gs.gameMode = 0 // Campaign
+            gs.difficulty = DifficultyLevel.HARD // Hard mode for max spawners
+            gs.gameMode = GameModeId.CAMPAIGN // Campaign
             gs.activeObjective = StandardObjective() // Default
             
             // Mock map generation similar to GameEngine
             val scale = 1.0f
             val seed = 1000 + level
-            gs.gridMap = MazeGenerator.generateLevelMap(level, gs.gameMode, gs.difficulty, seed)
+            gs.gridMap = MazeGenerator.generateLevelMap(level, gs.gameMode.id, gs.difficulty.id, seed)
             
             val columns = gs.gridMap!!.size
             val rows = gs.gridMap!![0].size

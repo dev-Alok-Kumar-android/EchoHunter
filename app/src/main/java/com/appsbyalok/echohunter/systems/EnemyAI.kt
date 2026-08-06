@@ -1,5 +1,6 @@
 package com.appsbyalok.echohunter.systems
 
+import com.appsbyalok.echohunter.engine.DifficultyLevel
 import com.appsbyalok.echohunter.engine.GameState
 import kotlin.math.sqrt
 
@@ -138,7 +139,7 @@ class EnemyAI {
 
         if (cx !in hm.indices || cy !in hm[0].indices) return Pair(evx, evy)
 
-        val config = com.appsbyalok.echohunter.data.LevelEngine.getLevelConfig(gs.currentLevel, gs.difficulty)
+        val config = com.appsbyalok.echohunter.data.LevelEngine.getLevelConfig(gs.currentLevel, gs.difficulty.id)
         if (kotlin.random.Random.nextFloat() > config.aiIntelligence) {
             return Pair(evx + (kotlin.random.Random.nextFloat() - 0.5f) * speed * dt * 5f, evy + (kotlin.random.Random.nextFloat() - 0.5f) * speed * dt * 5f)
         }
@@ -163,7 +164,7 @@ class EnemyAI {
         
         // --- DIFFICULTY-BASED STEERING ---
         // Normal (0): 5f (Smooth turns), Hard (1): 10f (Sharp turns)
-        val steerSharpness = if (gs.difficulty == 1) 10f else 5f
+        val steerSharpness = if (gs.difficulty == DifficultyLevel.HARD) 10f else 5f
         val lerpFactor = (dt * steerSharpness).coerceIn(0f, 1f)
         
         return if (dist > 0f) {

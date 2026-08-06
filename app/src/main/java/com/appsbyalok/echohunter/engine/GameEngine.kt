@@ -29,12 +29,12 @@ class GameEngine(
     private val context: Context
 ) {
 
-    var onChangeState: ((Int) -> Unit)? = null
+    var onChangeState: ((AppStateId) -> Unit)? = null
     var onDamage: ((Float) -> Unit)? = null
     var onScore: ((Long) -> Unit)? = null
     var onCoreUnlock: ((Boolean) -> Unit)? = null
     var onBossTrigger: ((Int, Float) -> Unit)? = null
-    var onStoryState: ((IntArray, Int) -> Unit)? = null
+    var onStoryState: ((IntArray, AppStateId) -> Unit)? = null
 
     private val arsenalSys = ArsenalSystem(gs, effectSys, spawnerSys, enemySys)
     private val playerAI = PlayerAI(gs, enemySys)
@@ -51,13 +51,13 @@ class GameEngine(
         StoryProtocol.update(dt)
         gs.isBlackoutActive = StoryProtocol.isBlackoutActive
 
-        if (gs.state == 0) {
+        if (gs.state == AppStateId.MENU) {
             effectSys.update(dt, targetH)
             return
         }
 
-        if (gs.state == 3) return
-        if (gs.state != 1 && gs.state != 8 && gs.state != 9) return
+        if (gs.state == AppStateId.HELP) return
+        if (!gs.state.isGameplay) return
 
         if (gs.hitStopTimer > 0f) {
             gs.hitStopTimer -= dt
@@ -72,7 +72,7 @@ class GameEngine(
             if (gs.isOverclocked) gs.overclockTimer = 5f
         }
 
-        if (gs.state == 1 || gs.state == 8) {
+        if (gs.state == AppStateId.PLAYING || gs.state == AppStateId.CORE_MERGE) {
             inputSys.update(simDt, scale, enemySys)
             if (gs.isAutoPilotActive) playerAI.update(simDt, scale)
             arsenalSys.update(simDt, scale)
@@ -93,11 +93,11 @@ class GameEngine(
             // --- FIX: Camera update should always follow ModeStrategy ---
             gs.updateCameraAndMovement(simDt, targetW, targetH ,scale)
 
-            if (gs.state == 8) {
+            if (gs.state == AppStateId.CORE_MERGE) {
                 val cdx = gs.px - gs.coreX
                 val cdy = gs.py - gs.coreY
                 if (cdx * cdx + cdy * cdy < gs.coreRadius * gs.coreRadius) {
-                    gs.state = 9
+                    gs.state = AppStateId.PERFECT_END_ZOOM
                     gs.mergeTimer = 0f
                     gs.whiteFlash = 0f
                     gs.isTouching = false
@@ -106,7 +106,7 @@ class GameEngine(
             }
         }
 
-        if (gs.state == 9) {
+        if (gs.state == AppStateId.PERFECT_END_ZOOM) {
             gs.cameraX += (gs.coreX - targetW / 2f - gs.cameraX) * 2f * dt
             gs.cameraY += (gs.coreY - targetH / 2f - gs.cameraY) * 2f * dt
             gs.px += (gs.coreX - gs.px) * 2.5f * dt
@@ -116,7 +116,7 @@ class GameEngine(
 
             if (gs.mergeTimer > 2.5f) gs.whiteFlash += dt * 0.5f
             if (gs.whiteFlash >= 1f) {
-                onStoryState?.invoke(if (gs.isPerfectEnd) StoryProtocol.storyPerfectEnding else StoryProtocol.storyNeutralEnding, 6)
+                onStoryState?.invoke(if (gs.isPerfectEnd) StoryProtocol.storyPerfectEnding else StoryProtocol.storyNeutralEnding, AppStateId.STORY_ENDING)
                 gs.whiteFlash = 0f
             }
         }
@@ -128,19 +128,19 @@ class GameEngine(
         gs.updatePulseRadius(simDt, maxSonarRad)
 
 
-        if (gs.isLevelCleared && gs.state == 1) {
+        if (gs.isLevelCleared && gs.state == AppStateId.PLAYING) {
             // Wait for winDelayTimer before showing victory UI
             if (gs.winDelayTimer > 0f) {
                 // Keep updating visuals but skip objective reward logic
             } else {
-                if (gs.gameMode == 2) {
+                if (gs.gameMode == GameModeId.TRAINING) {
                     // Training Mode Completion: Redirect to Mainframe
                     gs.isLevelCleared = false
-                    onChangeState?.invoke(15)
+                    onChangeState?.invoke(AppStateId.MAINFRAME)
                     return
                 }
 
-                if (gs.gameMode == 0) {
+                if (gs.gameMode == GameModeId.CAMPAIGN) {
                     gs.isLevelCleared = false // Reset only AFTER rewards are processed
                     val config = LevelEngine.getLevelConfig(gs.currentLevel)
                     var finalReward = config.clearRewardKB
@@ -161,7 +161,7 @@ class GameEngine(
 
                     // Calculate Stars based on specific achievements
                     val duration = gs.timeSinceStart - gs.levelStartTime
-                    val isHard = gs.difficulty == 1
+                    val isHard = gs.difficulty == DifficultyLevel.HARD
                     val noDamage = !gs.tookDamageInLevel
                     val underPar = duration <= config.parTime
 
@@ -189,7 +189,7 @@ class GameEngine(
                     SaveManager.saveLevelStats(gs.currentLevel, duration, stars, recordsMask, isHard)
                     EchoAudioManager.playSound(ToneGenerator.TONE_SUP_CONFIRM, 500)
 
-                    onChangeState?.invoke(12)
+                    onChangeState?.invoke(AppStateId.VICTORY)
                     return
                 }
             }
@@ -198,18 +198,18 @@ class GameEngine(
         effectSys.recordTrail(gs.px, gs.py)
         effectSys.update(simDt, scale)
 
-        if (gs.state == 1 || gs.state == 8) {
+        if (gs.state.isGameplay) {
             // --- MODULAR OBJECTIVE CALL ---
             // Updates timers and dynamic logic (like Core activation in Story Mode)
             gs.activeObjective.updateObjective(simDt, gs, enemySys, spawnerSys, viewportW, viewportH, scale)
 
             // --- CRITICAL: WIN CONDITION CHECK ---
             // Modular objectives determine if the level is cleared (Campaign Mode)
-            if (gs.gameMode == 0 && !gs.isLevelCleared && gs.activeObjective.checkWinCondition(gs)) {
+            if (gs.gameMode == GameModeId.CAMPAIGN && !gs.isLevelCleared && gs.activeObjective.checkWinCondition(gs)) {
                 gs.isLevelCleared = true
             }
 
-            if (gs.gameMode != 2) spawnerSys.update(simDt, gs, viewportW, scale)
+            if (gs.gameMode != GameModeId.TRAINING) spawnerSys.update(simDt, gs, viewportW, scale)
             enemySys.updateEnemies(simDt, gs, effectSys, viewportW, viewportH, scale)
             enemySys.updateBoss(simDt, gs, effectSys, scale)
             enemySys.updatePowerups(simDt, gs, effectSys, viewportW, viewportH)
@@ -217,7 +217,7 @@ class GameEngine(
             collisionSys.checkCollisions(scale, onDamage!!, onScore!!, onCoreUnlock!!)
 
             // Boss Spawns & Sector Story triggers only in main gameplay
-            if (gs.state == 1) gs.modeStrategy.checkProgression(context, gs, scale, onBossTrigger!!, onStoryState!!)
+            if (gs.state == AppStateId.PLAYING) gs.modeStrategy.checkProgression(context, gs, scale, onBossTrigger!!, onStoryState!!)
 
             handleAudioBeats(simDt)
         }
@@ -243,7 +243,7 @@ class GameEngine(
 
     fun generateLevelMaze(targetW: Float, targetH: Float, scale: Float) {
         val seed = 1000 + gs.currentLevel
-        gs.gridMap = com.appsbyalok.echohunter.data.MazeGenerator.generateLevelMap(gs.currentLevel, gs.gameMode, gs.difficulty, seed, gs.selectedStoryAct)
+        gs.gridMap = com.appsbyalok.echohunter.data.MazeGenerator.generateLevelMap(gs.currentLevel, gs.gameMode.id, gs.difficulty.id, seed, gs.selectedStoryAct)
 
         val columns = gs.gridMap!!.size
         val rows = gs.gridMap!![0].size
@@ -279,8 +279,8 @@ class GameEngine(
         gs.activeObjective.setupObjective(gs, enemySys, spawnerSys, targetW, targetH, scale)
 
         // Physically spawn enemies immediately so the map isn't empty
-        if (gs.gameMode != 2 && gs.spawnerNodes.isNotEmpty()) {
-            val preSpawnCount = if (gs.difficulty == 1) 10 else 7
+        if (gs.gameMode != GameModeId.TRAINING && gs.spawnerNodes.isNotEmpty()) {
+            val preSpawnCount = if (gs.difficulty == DifficultyLevel.HARD) 10 else 7
             repeat(preSpawnCount) {
                 val node = gs.spawnerNodes.random()
                 for (j in 0 until enemySys.n) {
@@ -296,7 +296,7 @@ class GameEngine(
         gs.controls.isManualAimUnlocked = SaveManager.isManualAimUnlocked
 
         // Start level with a few more enemies queued to emerge shortly
-        val initialPop = if (gs.difficulty == 1) 8 else 5
+        val initialPop = if (gs.difficulty == DifficultyLevel.HARD) 8 else 5
         spawnerSys.queueSpawns(initialPop, gs)
 
         gs.cameraX = gs.px - targetW / 2f

@@ -1,6 +1,7 @@
 package com.appsbyalok.echohunter.systems
 
 import android.media.ToneGenerator
+import com.appsbyalok.echohunter.engine.DifficultyLevel
 import com.appsbyalok.echohunter.engine.GameState
 import com.appsbyalok.echohunter.utils.EchoAudioManager
 import com.appsbyalok.echohunter.utils.GameColors
@@ -48,7 +49,7 @@ object PatrolBehavior : IEnemyBehavior {
         val config = com.appsbyalok.echohunter.data.LevelEngine.getLevelConfig(gs.currentLevel)
         val reactionThreshold = scale * (1.5f + (gs.currentLevel * 0.01f).coerceAtMost(1.0f))
 
-        val speed = scale * (if (gs.difficulty == 0) 0.25f else 0.4f) * config.speedMultiplier
+        val speed = scale * (if (gs.difficulty == DifficultyLevel.NORMAL) 0.25f else 0.4f) * config.speedMultiplier
 
         val hitByPulse = (gs.pulse && td2 in gs.innerRSq..gs.outerRSq)
 
@@ -139,7 +140,7 @@ object HunterBehavior : IEnemyBehavior {
 
         val dist = sqrt(td2)
         val config = com.appsbyalok.echohunter.data.LevelEngine.getLevelConfig(gs.currentLevel)
-        val speed = scale * (if (gs.difficulty == 0) 0.25f else 0.4f) * config.speedMultiplier
+        val speed = scale * (if (gs.difficulty == DifficultyLevel.NORMAL) 0.25f else 0.4f) * config.speedMultiplier
 
         // Predictive Movement Logic: Anticipate player movement but cap it by distance to prevent overshooting
         val baseLead = (gs.currentLevel * 0.004f).coerceAtMost(0.4f)
@@ -163,7 +164,7 @@ object HunterBehavior : IEnemyBehavior {
             val eDist = sqrt(ptd2)
 
             // Speed Multiplier: Normal is easier, Hard is faster
-            val chaseMult = if (gs.difficulty == 1) 1.2f else 1.05f
+            val chaseMult = if (gs.difficulty == DifficultyLevel.HARD) 1.2f else 1.05f
 
             // Effect of Decoy or Camouflage
             val isPlayerTarget = !gs.isDecoyActive && !gs.isCamouflaged
@@ -202,7 +203,7 @@ object KamikazeBehavior : IEnemyBehavior {
         targetH: Float,
         scale: Float,
     ) {
-        val speed = scale * (if (gs.difficulty == 0) 0.25f else 0.35f)
+        val speed = scale * (if (gs.difficulty == DifficultyLevel.NORMAL) 0.25f else 0.35f)
         // Relentlessly pathfind to the Core Map
         if (gs.gridMap != null) {
             val (nvx, nvy) = ai.steerByCoreHeatMap(
@@ -236,7 +237,7 @@ object TargetBehavior : IEnemyBehavior {
         val dist = sqrt(td2)
         val config = com.appsbyalok.echohunter.data.LevelEngine.getLevelConfig(gs.currentLevel)
         val speedMult = config.speedMultiplier
-        val speed = scale * (if (gs.difficulty == 0) 0.25f else 0.35f) * speedMult
+        val speed = scale * (if (gs.difficulty == DifficultyLevel.NORMAL) 0.25f else 0.35f) * speedMult
 
         val panicDist = scale * (0.8f + (gs.currentLevel * 0.005f).coerceAtMost(0.5f))
         val inLoS = ai.hasLineOfSight(enemySys.ex[i], enemySys.ey[i], targetX, targetY, gs)
@@ -245,10 +246,10 @@ object TargetBehavior : IEnemyBehavior {
         if (inLoS && td2 < panicDist * panicDist) {
             enemySys.eState[i] = 2 // Alert state
             if (dist > 0f) {
-                val steerSharpness = if (gs.difficulty == 1) 8f else 4f
+                val steerSharpness = if (gs.difficulty == DifficultyLevel.HARD) 8f else 4f
                 val lerpFactor = (dt * steerSharpness).coerceIn(0f, 1f)
 
-                val fleeMult = if (gs.difficulty == 1) 1.5f else 1.2f
+                val fleeMult = if (gs.difficulty == DifficultyLevel.HARD) 1.5f else 1.2f
                 val targetVx = -(tdx / dist) * speed * fleeMult
                 val targetVy = -(tdy / dist) * speed * fleeMult
                 enemySys.evx[i] = (enemySys.evx[i] * (1f - lerpFactor)) + (targetVx * lerpFactor)
@@ -448,7 +449,7 @@ object GuardBehavior : IEnemyBehavior {
         if (isInterceptor && isAlerted && playerWithinTether) {
             // INTERCEPT MODE: Move towards player
             enemySys.eState[i] = 1
-            val pdist = kotlin.math.sqrt(distToPlayerSq.toDouble()).toFloat().coerceAtLeast(0.01f)
+            val pdist = sqrt(distToPlayerSq.toDouble()).toFloat().coerceAtLeast(0.01f)
             val speed = scale * 0.5f
             enemySys.evx[i] = (tdx / pdist) * speed
             enemySys.evy[i] = (tdy / pdist) * speed
@@ -460,8 +461,8 @@ object GuardBehavior : IEnemyBehavior {
                 val gdy = enemySys.ey[i] - enemySys.ey[j]
                 val gdistSq = gdx * gdx + gdy * gdy
                 if (gdistSq < (scale * 0.1f) * (scale * 0.1f)) {
-                    enemySys.evx[i] += (gdx / 0.01f.coerceAtLeast(kotlin.math.sqrt(gdistSq.toDouble()).toFloat())) * scale * 0.1f
-                    enemySys.evy[i] += (gdy / 0.01f.coerceAtLeast(kotlin.math.sqrt(gdistSq.toDouble()).toFloat())) * scale * 0.1f
+                    enemySys.evx[i] += (gdx / 0.01f.coerceAtLeast(sqrt(gdistSq.toDouble()).toFloat())) * scale * 0.1f
+                    enemySys.evy[i] += (gdy / 0.01f.coerceAtLeast(sqrt(gdistSq.toDouble()).toFloat())) * scale * 0.1f
                 }
             }
         } else {
@@ -480,7 +481,7 @@ object GuardBehavior : IEnemyBehavior {
             
             val odx = orbitX - enemySys.ex[i]
             val ody = orbitY - enemySys.ey[i]
-            val odist = kotlin.math.sqrt((odx * odx + ody * ody).toDouble()).toFloat().coerceAtLeast(0.01f)
+            val odist = sqrt((odx * odx + ody * ody).toDouble()).toFloat().coerceAtLeast(0.01f)
             
             // High tracking speed to stay glued to the HVT
             val speed = scale * 0.8f 
@@ -653,7 +654,7 @@ object GuardianBossBehavior : IBossBehavior {
         // --- DYNAMIC SCALING (Targeting Extreme Depths) ---
         val depthFactor =
             (gs.currentLevel / 1200f).coerceAtMost(0.7f) // Attack frequency increases with level
-        val hardMult = if (gs.difficulty == 1) 0.8f else 1.0f // 20% faster in Hard Mode
+        val hardMult = if (gs.difficulty == DifficultyLevel.HARD) 0.8f else 1.0f // 20% faster in Hard Mode
 
         val baseCooldown = if (gs.isBossRage) 2.2f else 3.8f
         val attackCooldown = baseCooldown * (1f - depthFactor) * hardMult
@@ -700,7 +701,7 @@ object GuardianBossBehavior : IBossBehavior {
                 val baseChance = if (gs.currentLevel >= 15) 0.10f else 0f
                 val levelBonus = (gs.currentLevel / 1500f).coerceAtMost(0.35f)
                 val rageBonus =
-                    if (gs.isBossRage) (if (gs.difficulty == 1) 0.50f else 0.30f) else 0.0f
+                    if (gs.isBossRage) (if (gs.difficulty == DifficultyLevel.HARD) 0.50f else 0.30f) else 0.0f
 
                 val totalChance = baseChance + levelBonus + rageBonus
 
@@ -753,7 +754,7 @@ object StalkerBossBehavior : IBossBehavior {
     override fun updateSpecial(dt: Float, gs: GameState, enemySys: EnemySystem, scale: Float) {
         // --- DYNAMIC SCALING ---
         val depthFactor = (gs.currentLevel / 1500f).coerceAtMost(0.6f)
-        val hardMult = if (gs.difficulty == 1) 0.85f else 1.0f
+        val hardMult = if (gs.difficulty == DifficultyLevel.HARD) 0.85f else 1.0f
 
         gs.bossAttackTimer += dt
         val baseCooldown = if (gs.isBossRage) 1.5f else 3.2f
@@ -869,7 +870,7 @@ object GlitchBossBehavior : IBossBehavior {
 
     override fun updateSpecial(dt: Float, gs: GameState, enemySys: EnemySystem, scale: Float) {
         val depthFactor = (gs.currentLevel / 1200f).coerceAtMost(0.7f)
-        val hardMult = if (gs.difficulty == 1) 0.8f else 1.0f
+        val hardMult = if (gs.difficulty == DifficultyLevel.HARD) 0.8f else 1.0f
         
         gs.bossAttackTimer += dt
         val baseInterval = if (gs.isBossRage) 3.5f else 6.0f
@@ -974,7 +975,8 @@ object OmegaBossBehavior : IBossBehavior {
         if (gs.bossAttackTimer > 8f) {
             gs.bossAttackTimer = 0f
             // Spawn Hunter Swarm
-            for (i in 0 until 3) {
+            val swarmSpawnCount = 3
+            repeat(swarmSpawnCount) {
                 enemySys.spawnSwarmIfNeeded(gs, scale)
             }
             com.appsbyalok.echohunter.data.StoryProtocol.showIngameMessage(

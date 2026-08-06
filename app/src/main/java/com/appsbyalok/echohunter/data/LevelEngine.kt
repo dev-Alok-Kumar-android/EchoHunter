@@ -3,18 +3,22 @@ package com.appsbyalok.echohunter.data
 import kotlin.math.pow
 
 // Represents individual gameplay components that can overlap cleanly
-enum class LevelFeature {
-    CLASSIC,       // Baseline Default: Score/Data collect to win
-    MAZE,          // Structural Variation: Tight/Complex path layout (% 6)
-    DARKNESS,      // Environmental Modifier: Lights out, Sonar needed (% 8)
-    BOSS,          // Prime 5: Warden Arena entity encounter
-    ELIMINATION,   // Prime 7: Terminate high-value target security arrays
-    ESCAPE,        // Prime 11: Secure target threshold then locate escape gate
-    DEFENSE,       // Prime 13: Protect the central core protocol
-    BOMB,          // Prime 17: Plant a Logic Bomb and defend it
-    CLEAN_SWEEP,   // Prime 19: Destroy all security compilers (spawners)
-    SPECIAL,       // Narrative anomaly elements
-    ADMIN_BONUS    // Level 100 Easter Egg override
+enum class LevelFeature(val id: Int) {
+    CLASSIC(0),       // Baseline Default: Score/Data collect to win
+    MAZE(1),          // Structural Variation: Tight/Complex path layout (% 6)
+    DARKNESS(2),      // Environmental Modifier: Lights out, Sonar needed (% 8)
+    BOSS(3),          // Prime 5: Warden Arena entity encounter
+    ELIMINATION(4),   // Prime 7: Terminate high-value target security arrays
+    ESCAPE(5),        // Prime 11: Secure target threshold then locate escape gate
+    DEFENSE(6),       // Prime 13: Protect the central core protocol
+    BOMB(7),          // Prime 17: Plant a Logic Bomb and defend it
+    CLEAN_SWEEP(8),   // Prime 19: Destroy all security compilers (spawners)
+    SPECIAL(9),       // Narrative anomaly elements
+    ADMIN_BONUS(10);  // Level 100 Easter Egg override
+
+    companion object {
+        fun fromId(id: Int): LevelFeature? = entries.find { it.id == id }
+    }
 }
 
 data class LevelConfig(
@@ -44,29 +48,29 @@ object LevelEngine {
      * Returns a bitmask of LevelFeature ordinals.
      */
     fun getFeaturesMask(level: Int): Int {
-        if (level % 100 == 0) return (1 shl LevelFeature.ADMIN_BONUS.ordinal) or (1 shl LevelFeature.BOSS.ordinal)
-        if (level == 1) return (1 shl LevelFeature.CLASSIC.ordinal)
+        if (level % 100 == 0) return (1 shl LevelFeature.ADMIN_BONUS.id) or (1 shl LevelFeature.BOSS.id)
+        if (level == 1) return (1 shl LevelFeature.CLASSIC.id)
 
         var mask = 0
-        if (level % 5 == 0)  mask = mask or (1 shl LevelFeature.BOSS.ordinal)
-        if (level % 7 == 0)  mask = mask or (1 shl LevelFeature.ELIMINATION.ordinal)
-        if (level % 11 == 0) mask = mask or (1 shl LevelFeature.ESCAPE.ordinal)
-        if (level % 13 == 0) mask = mask or (1 shl LevelFeature.DEFENSE.ordinal)
-        if (level % 17 == 0) mask = mask or (1 shl LevelFeature.BOMB.ordinal)
-        if (level % 19 == 0) mask = mask or (1 shl LevelFeature.CLEAN_SWEEP.ordinal)
+        if (level % 5 == 0)  mask = mask or (1 shl LevelFeature.BOSS.id)
+        if (level % 7 == 0)  mask = mask or (1 shl LevelFeature.ELIMINATION.id)
+        if (level % 11 == 0) mask = mask or (1 shl LevelFeature.ESCAPE.id)
+        if (level % 13 == 0) mask = mask or (1 shl LevelFeature.DEFENSE.id)
+        if (level % 17 == 0) mask = mask or (1 shl LevelFeature.BOMB.id)
+        if (level % 19 == 0) mask = mask or (1 shl LevelFeature.CLEAN_SWEEP.id)
 
-        if (level % 6 == 0) mask = mask or (1 shl LevelFeature.MAZE.ordinal)
-        if (level % 8 == 0) mask = mask or (1 shl LevelFeature.DARKNESS.ordinal)
+        if (level % 6 == 0) mask = mask or (1 shl LevelFeature.MAZE.id)
+        if (level % 8 == 0) mask = mask or (1 shl LevelFeature.DARKNESS.id)
 
-        val primaryMask = (1 shl LevelFeature.BOSS.ordinal) or
-                (1 shl LevelFeature.ELIMINATION.ordinal) or
-                (1 shl LevelFeature.ESCAPE.ordinal) or
-                (1 shl LevelFeature.DEFENSE.ordinal) or
-                (1 shl LevelFeature.BOMB.ordinal) or
-                (1 shl LevelFeature.CLEAN_SWEEP.ordinal)
+        val primaryMask = (1 shl LevelFeature.BOSS.id) or
+                (1 shl LevelFeature.ELIMINATION.id) or
+                (1 shl LevelFeature.ESCAPE.id) or
+                (1 shl LevelFeature.DEFENSE.id) or
+                (1 shl LevelFeature.BOMB.id) or
+                (1 shl LevelFeature.CLEAN_SWEEP.id)
 
         if ((mask and primaryMask) == 0) {
-            mask = mask or (1 shl LevelFeature.CLASSIC.ordinal)
+            mask = mask or (1 shl LevelFeature.CLASSIC.id)
         }
         return mask
     }
@@ -78,7 +82,7 @@ object LevelEngine {
         val mask = getFeaturesMask(level)
         val features = mutableSetOf<LevelFeature>()
         LevelFeature.entries.forEach { 
-            if ((mask and (1 shl it.ordinal)) != 0) features.add(it)
+            if ((mask and (1 shl it.id)) != 0) features.add(it)
         }
         return features
     }

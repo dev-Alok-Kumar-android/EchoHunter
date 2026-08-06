@@ -9,6 +9,7 @@ import android.view.MotionEvent
 import com.appsbyalok.echohunter.data.LevelEngine
 import com.appsbyalok.echohunter.data.LevelFeature
 import com.appsbyalok.echohunter.data.SaveManager
+import com.appsbyalok.echohunter.engine.DifficultyLevel
 import com.appsbyalok.echohunter.engine.GameState
 import com.appsbyalok.echohunter.ui.archives.ArchiveDetailView
 import com.appsbyalok.echohunter.ui.archives.ArchiveFilterSystem
@@ -171,7 +172,7 @@ class UIArchives {
         }
 
         val selectedMask =
-            filterSystem.selectedFeatures.fold(0) { acc, feat -> acc or (1 shl feat.ordinal) }
+            filterSystem.selectedFeatures.fold(0) { acc, feat -> acc or (1 shl feat.id) }
         val mode = filterSystem.featureFilterMode
         val uniqueOnly = filterSystem.filterUniqueOnly
         val finishedOnly = filterSystem.filterFinishedOnly
@@ -741,7 +742,7 @@ class UIArchives {
         var colorCount = 0
 
         for (f in featureEnumValues) {
-            if ((mask and (1 shl f.ordinal)) != 0) {
+            if ((mask and (1 shl f.id)) != 0) {
                 val featureColor = getFeatureColor(f)
                 mixedColor = if (colorCount == 0) featureColor else GameColors.mixColors(
                     mixedColor, featureColor, 0.5f
@@ -804,7 +805,7 @@ class UIArchives {
         var currentBadgeX = rect.centerX() - (totalBadgesW / 2f)
         val badgeY = rect.bottom - badgeSize - (boxSize * 0.08f)
         for (f in featureEnumValues) {
-            if ((mask and (1 shl f.ordinal)) != 0) {
+            if ((mask and (1 shl f.id)) != 0) {
                 p.color = getFeatureColor(f); badgeRect.set(
                     currentBadgeX, badgeY, currentBadgeX + badgeSize, badgeY + badgeSize
                 )
@@ -1038,7 +1039,7 @@ class UIArchives {
             if (sortBoxRect.contains(x, y)) return -7
             if (filterModeRect.contains(x, y)) return -11
             if (clearFiltersBoxRect.contains(x, y)) return -12
-            for ((feat, rect) in featureRects) if (rect.contains(x, y)) return -20 - feat.ordinal
+            for ((feat, rect) in featureRects) if (rect.contains(x, y)) return -20 - feat.id
         }
         if (scroller.viewport.contains(x, y)) {
             val localY = y - (scroller.viewport.top + scroller.scrollY)
@@ -1059,7 +1060,7 @@ class UIArchives {
         if (fastPlayRequested != -1) {
             val lvl = fastPlayRequested
             fastPlayRequested = -1
-            SaveManager.incrementLevelAttempts(lvl, gs.difficulty == 1)
+            SaveManager.incrementLevelAttempts(lvl, gs.difficulty == DifficultyLevel.HARD)
             onSelect(lvl)
             return true
         }
@@ -1093,7 +1094,7 @@ class UIArchives {
                             -102 -> {
                                 val lvl = selectedDetailLevel; selectedDetailLevel =
                                     -1; SaveManager.incrementLevelAttempts(
-                                    lvl, gs.difficulty == 1
+                                    lvl, gs.difficulty == DifficultyLevel.HARD
                                 ); onSelect(lvl)
                             }
 
@@ -1155,7 +1156,7 @@ class UIArchives {
 
                             -11 -> {
                                 val v = FeatureFilterMode.entries; filterSystem.featureFilterMode =
-                                    v[(filterSystem.featureFilterMode.ordinal + 1) % v.size]; generateNodeList(
+                                    v[(filterSystem.featureFilterMode.id + 1) % v.size]; generateNodeList(
                                     false
                                 )
                             }
@@ -1166,18 +1167,18 @@ class UIArchives {
 
                             else -> {
                                 if (hitOnUp <= -20) {
-                                    val f = featureEnumValues.getOrNull(-(hitOnUp + 20))
+                                    val f = LevelFeature.fromId(-(hitOnUp + 20))
                                     if (f != null) {
-                                        if (filterSystem.selectedFeatures.contains(f)) filterSystem.selectedFeatures.remove(
-                                            f
-                                        ) else filterSystem.selectedFeatures.add(f); generateNodeList(
-                                            false
-                                        )
+                                        if (filterSystem.selectedFeatures.contains(f)) {
+                                            filterSystem.selectedFeatures.remove(f)
+                                        } else {
+                                            filterSystem.selectedFeatures.add(f)
+                                        }
+                                        generateNodeList(false)
                                     }
                                 } else {
-                                    selectedDetailLevel = hitOnUp; EchoAudioManager.playSound(
-                                        ToneGenerator.TONE_PROP_BEEP, 50
-                                    )
+                                    selectedDetailLevel = hitOnUp
+                                    EchoAudioManager.playSound(ToneGenerator.TONE_PROP_BEEP, 50)
                                 }
                             }
                         }
