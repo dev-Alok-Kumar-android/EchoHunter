@@ -10,17 +10,35 @@ import com.appsbyalok.echohunter.input.AttackMode
 import com.appsbyalok.echohunter.utils.EchoAudioManager
 import com.appsbyalok.echohunter.view.GameView
 
-// Blueprint (Interface) for every state
+/**
+ * Common lifecycle and interaction interface for all application states.
+ *
+ * Implementations define state-specific behavior for updating frame logic, rendering graphics,
+ * handling touch events, and responding to back navigation.
+ */
 interface IAppState {
+    /** Called when transitioning into this state. */
     fun onEnter(gs: GameState)
+
+    /** Called when transitioning away from this state. */
     fun onExit(gs: GameState)
+
+    /** Updates state logic given elapsed frame delta time [dt]. */
     fun update(dt: Float, gs: GameState, width: Float, height: Float, scale: Float)
+
+    /** Renders state graphics onto canvas [c]. */
     fun draw(c: Canvas, gs: GameState, width: Float, height: Float, scale: Float, dt: Float)
+
+    /** Handles raw touch input events mapped to virtual screen dimensions. */
     fun onTouch(e: MotionEvent, vx: Float, vy: Float, action: Int, gs: GameState, scale: Float, targetW: Float, targetH: Float): Boolean
+
+    /** Processes device or system back navigation events. */
     fun onBackPressed(gs: GameState): Boolean
 }
 
-// Parent State Manager
+/**
+ * Controller responsible for switching and delegating lifecycle events to active [IAppState] instances.
+ */
 class AppStateManager(val view: GameView, private val gs: GameState) {
     var currentState: IAppState? = null
         private set

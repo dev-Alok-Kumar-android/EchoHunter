@@ -47,6 +47,12 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.random.Random
 
+/**
+ * Custom Android [View] hosting the game loop, surface rendering, and touch input processing.
+ *
+ * Bridges core subsystems (engine, state manager, renderers, audio, HUD) with Android view lifecycle callbacks,
+ * handling surface scaling, aspect ratio fitting, frame rate timing, and save state persistence.
+ */
 class GameView(context: Context) : View(context) {
 
     val gs = GameState()

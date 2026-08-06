@@ -14,6 +14,12 @@ import com.appsbyalok.echohunter.systems.PlayerAI
 import com.appsbyalok.echohunter.systems.SpawnerSystem
 import com.appsbyalok.echohunter.utils.EchoAudioManager
 
+/**
+ * Central game engine orchestrating state updates, system ticks, combat events, and audio feedback.
+ *
+ * Coordinates physics, enemy AI, spawner routines, arsenal actions, and collision checks per frame tick.
+ * Communicates game state changes back to UI components via event callbacks.
+ */
 class GameEngine(
     private val gs: GameState,
     private val effectSys: EffectSystem,

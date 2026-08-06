@@ -12,9 +12,20 @@ import com.appsbyalok.echohunter.data.UpgradeSystem
 import com.appsbyalok.echohunter.utils.EchoAudioManager
 import com.appsbyalok.echohunter.view.GameView
 
+/**
+ * Main activity for the EchoHunter game application.
+ *
+ * Serves as the primary entry point, hosting the custom [GameView] and managing lifecycle events,
+ * window insets (notches/safe areas), system bar visibility (fullscreen/immersive mode),
+ * display orientation preferences, and back navigation across different Android API levels.
+ */
 class MainActivity : Activity() {
     private lateinit var gameView: GameView
 
+    /**
+     * Initializes singletons, views, cutout/system bar insets listeners, and back handlers.
+     * Sets immersive display mode and restores state if available.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         SaveManager.init(this)
@@ -69,21 +80,34 @@ class MainActivity : Activity() {
         }
     }
 
+    /**
+     * Pauses the game loop and sound playback when the activity goes into the background.
+     */
     override fun onPause() {
         super.onPause()
         gameView.onPause()
     }
 
+    /**
+     * Resumes the game loop and audio playback when the activity comes to the foreground.
+     */
     override fun onResume() {
         super.onResume()
         gameView.onResume()
     }
 
+    /**
+     * Saves game state to [outState] bundle during activity destruction or configuration changes.
+     */
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         gameView.saveState(outState)
     }
 
+    /**
+     * Legacy back button handler for Android 12 and below.
+     * Delegates back event handling to [GameView]. If unhandled by the game UI, triggers default back behavior.
+     */
     @Deprecated("Deprecated in Java")
     @SuppressLint("GestureBackNavigation")
     @Suppress("DEPRECATION")
@@ -93,11 +117,17 @@ class MainActivity : Activity() {
         }
     }
 
+    /**
+     * Releases audio and other hardware resources upon activity destruction.
+     */
     override fun onDestroy() {
         super.onDestroy()
         EchoAudioManager.release() // Releasing audio resources
     }
 
+    /**
+     * Updates requested screen orientation based on user configuration stored in [SaveManager].
+     */
     fun applyOrientation() {
         requestedOrientation = when (SaveManager.screenOrientation) {
             1 -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
