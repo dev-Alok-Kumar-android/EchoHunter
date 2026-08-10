@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "com.appsbyalok.echohunter"
-        minSdk = 16
+        minSdk = 21
         //noinspection OldTargetApi
         targetSdk = 36
         versionCode = 28
