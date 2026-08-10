@@ -112,7 +112,7 @@ class GameView(context: Context) : View(context) {
         } else {
             val target = navManager.popPreviousState()
             if (target == null || target == gs.state || (target == AppStateId.MENU && gs.state.isSubMenu)) disconnectCable()
-            else changeState(target!!, pushToHistory = false)
+            else changeState(target, pushToHistory = false)
         }
     }
     internal val onArchiveSelect: (Int) -> Unit = { lvl -> startGame(GameModeId.CAMPAIGN, lvl) }
@@ -243,7 +243,7 @@ class GameView(context: Context) : View(context) {
         EchoAudioManager.playSound(ToneGenerator.TONE_PROP_BEEP, 50)
 
 
-        if (mode == GameModeId.STORY) {
+        if (mode == GameModeId.STORY || mode == GameModeId.TRAINING) {
             currentStoryLines = gs.modeStrategy.getIntroLines()
             storyStep = 0
             gs.nextStateAfterStory = AppStateId.PLAYING

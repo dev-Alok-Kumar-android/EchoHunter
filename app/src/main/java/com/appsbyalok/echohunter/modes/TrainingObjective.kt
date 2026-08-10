@@ -9,6 +9,7 @@ import com.appsbyalok.echohunter.input.AttackMode
 import com.appsbyalok.echohunter.input.HudAction
 import com.appsbyalok.echohunter.systems.EnemySystem
 import com.appsbyalok.echohunter.systems.SpawnerSystem
+import com.appsbyalok.echohunter.systems.triggerCinematicFocus
 import com.appsbyalok.echohunter.utils.EchoAudioManager
 import com.appsbyalok.echohunter.utils.SpawnValidator
 import kotlin.math.sqrt
@@ -26,6 +27,12 @@ class TrainingObjective : IGameObjective {
     private var targetIndex = -1
     private var sonarPings = 0
     private var pulseCounted = false
+    private var trapCounter = 0f
+    private var trainingCompleteTriggered = false
+    private var empNeutralizedCount = 0
+    private var combatKills = 0
+    private val requiredKills = 3
+
 
     private val combatModes = arrayOf(
         AttackMode.MANUAL_AIM,
@@ -52,6 +59,10 @@ class TrainingObjective : IGameObjective {
         targetIndex = -1
         sonarPings = 0
         pulseCounted = false
+        trapCounter = 0f
+        trainingCompleteTriggered = false
+        empNeutralizedCount = 0
+        combatKills = 0
 
         gs.coreX = -9999f
         gs.coreY = -9999f
@@ -85,7 +96,7 @@ class TrainingObjective : IGameObjective {
         when (phase) {
             0 -> updateHudIntroduction(gs)
             1 -> updateCombatTraining(gs, enemySys, scale)
-            2 -> updateTrapTraining(gs, scale)
+            2 -> updateTrapTraining(gs, enemySys, scale)
             3 -> updateSonarEscape(gs)
             4 -> finishTraining(gs)
         }
@@ -110,56 +121,179 @@ class TrainingObjective : IGameObjective {
     }
 
     private fun updateCombatTraining(gs: GameState, enemySys: EnemySystem, scale: Float) {
-        gs.tutorialEnabledActions = setOf(HudAction.ATTACK)
-        gs.objectiveLabel = "PHASE 1: COMBAT ${combatTrial + 1} / ${combatModes.size}"
-        gs.objectiveProgress = combatTrial.toFloat() / combatModes.size
-
         if (combatTrial >= combatModes.size) {
             clearTarget(gs)
             advancePhase()
             return
         }
 
-        if (targetIndex == -1) {
-            gs.controls.activeAttackMode = combatModes[combatTrial]
-            gs.controls.currentWeapon = combatTrial
-            StoryProtocol.showTypewriterMessage(
-                "ENEMY DETECTED. ${aimNames[combatTrial]} + ${weaponNames[combatTrial]} ONLINE. PURGE THE HIGHLIGHTED TARGET.",
-                5f
-            )
-            targetIndex = spawnTrainingTarget(gs, enemySys, scale)
-            gs.tutorialHighlightedEnemyIndex = targetIndex
-            return
-        }
+        gs.tutorialEnabledActions = setOf(HudAction.ATTACK)
+        gs.objectiveLabel = "PHASE 1: COMBAT - ${aimNames[combatTrial]} ($combatKills/$requiredKills)"
+        gs.objectiveProgress = (combatTrial.toFloat() + (combatKills.toFloat() / requiredKills)) / combatModes.size
 
-        if (targetIndex < 0 || enemySys.ex[targetIndex] < -1000f) {
-            combatTrial++
+        // Detect if the previous target was just eliminated
+        if (targetIndex != -1 && enemySys.ex[targetIndex] < -1000f) {
+            combatKills++
             targetIndex = -1
             gs.tutorialHighlightedEnemyIndex = -1
-            EchoAudioManager.playSound(ToneGenerator.TONE_CDMA_PIP, 150)
+            EchoAudioManager.playSound(ToneGenerator.TONE_CDMA_PIP, 100)
+            
+            if (combatKills >= requiredKills) {
+                combatTrial++
+                combatKills = 0
+                return // Let next frame handle the next weapon/mode spawning
+            }
+        }
+
+        // Spawn a target if none is active
+        if (targetIndex == -1 || enemySys.ex[targetIndex] < -1000f) {
+            gs.controls.activeAttackMode = combatModes[combatTrial]
+            gs.controls.currentWeapon = combatTrial
+            
+            // Only show the briefing message for the first kill of a new weapon/mode
+            if (combatKills == 0) {
+                StoryProtocol.showTypewriterMessage(
+                    "ENEMY DETECTED. ${aimNames[combatTrial]} + ${weaponNames[combatTrial]} ONLINE. PURGE THE TARGETS.",
+                    5f
+                )
+            }
+            
+            targetIndex = spawnTrainingTarget(gs, enemySys, scale, triggerCinematic = true)
+            gs.tutorialHighlightedEnemyIndex = targetIndex
         }
     }
 
-    private fun updateTrapTraining(gs: GameState, scale: Float) {
-        gs.tutorialEnabledActions = setOf(HudAction.TRAP)
-        gs.objectiveLabel = "PHASE 2: TRAPS ${trapTrial + 1} / ${trapNames.size}"
-        gs.objectiveProgress = trapTrial.toFloat() / (trapNames.size + 1)
+    private fun updateTrapTraining(gs: GameState, enemySys: EnemySystem, scale: Float) {
+        if (trapTrial >= trapNames.size) {
+            // Already finished all traps, wait for transition gate logic below
+        } else {
+            gs.tutorialEnabledActions = setOf(HudAction.TRAP)
+            gs.objectiveLabel = "PHASE 2: TRAPS - ${trapNames[trapTrial]}"
+            gs.objectiveProgress = (trapTrial.toFloat() + (trapCounter / 1.5f).coerceAtMost(1f)) / (trapNames.size + 1)
+        }
 
         if (trapTrial < trapNames.size) {
             gs.controls.currentTrap = trapTrial
             if (messageStep != trapTrial) {
-                StoryProtocol.showTypewriterMessage(
-                    "${trapNames[trapTrial]} TRAP ONLINE. TAP TRAP TO DEPLOY IT, OR HOLD AND DRAG TO REVIEW THE TRAP WHEEL.",
-                    5f
-                )
+                val instruction = when(trapTrial) {
+                    0 -> "VOID SHADOW: CLOAK ACTIVE. BYPASS THE SENSOR BY STAYING NEAR IT WHILE INVISIBLE."
+                    1 -> "DECOY: DEPLOY AN ECHO. WAIT FOR THE HUNTER TO REACH THE DECOY'S POSITION."
+                    2 -> "EMP: SWARM DETECTED. RELEASE A PULSE TO NEUTRALIZE MULTIPLE TARGETS."
+                    else -> ""
+                }
+                StoryProtocol.showTypewriterMessage(instruction, 5f)
                 messageStep = trapTrial
+                
+                // Specialized Spawning for logical situations
+                when(trapTrial) {
+                    0 -> { // Camo: Stationary Target
+                        targetIndex = spawnTrainingTarget(gs, enemySys, scale, type = 0, triggerCinematic = true) // Patrol
+                        gs.tutorialHighlightedEnemyIndex = targetIndex
+                        if (targetIndex != -1) {
+                            enemySys.evx[targetIndex] = 0f
+                            enemySys.evy[targetIndex] = 0f
+                        }
+                    }
+                    1 -> { // Decoy: Hunter that needs to be lured
+                        targetIndex = spawnTrainingTarget(gs, enemySys, scale, type = 1, triggerCinematic = true) // Force Hunter
+                        gs.tutorialHighlightedEnemyIndex = targetIndex
+                    }
+                    2 -> { // EMP: Swarm of targets
+                        clearTarget(gs)
+                        empNeutralizedCount = 0
+                        // Spawn them in a cluster
+                        val offsets = arrayOf(
+                            0.55f to -0.1f, 0.58f to 0.1f, 
+                            0.68f to -0.05f, 0.72f to 0.15f
+                        )
+                        offsets.forEachIndexed { i, off ->
+                            val idx = spawnTrainingTarget(gs, enemySys, scale, 
+                                offsetX = off.first, offsetY = off.second, type = 1, triggerCinematic = (i == 0))
+                            if (i == 0) targetIndex = idx
+                        }
+                    }
+                }
             }
 
-            if (gs.activeTraps.any { it.type == trapTrial }) {
-                trapTrial++
-                gs.trapCooldownTimer = 0f
-                EchoAudioManager.playSound(ToneGenerator.TONE_CDMA_PIP, 150)
+            // Success Condition for each trap
+            val isTrapped = when(trapTrial) {
+                0 -> { // Camo: Player invisible and close
+                    val dx = if (targetIndex != -1 && enemySys.ex[targetIndex] > -1000f) enemySys.ex[targetIndex] - gs.px else 999f
+                    val dy = if (targetIndex != -1 && enemySys.ey[targetIndex] > -1000f) enemySys.ey[targetIndex] - gs.py else 999f
+                    gs.isCamouflaged && (dx*dx + dy*dy) < (scale * 0.25f) * (scale * 0.25f)
+                }
+                1 -> { // Decoy: Target reached decoy
+                    if (targetIndex != -1 && enemySys.ex[targetIndex] > -1000f && gs.isDecoyActive) {
+                        val ddx = enemySys.ex[targetIndex] - gs.decoyX
+                        val ddy = enemySys.ey[targetIndex] - gs.decoyY
+                        (ddx * ddx + ddy * ddy) < (scale * 0.15f) * (scale * 0.15f)
+                    } else false
+                }
+                2 -> { // EMP: Check how many were cleared (monitored via enemySys counts)
+                    var currentActiveCount = 0
+                    for (i in 0 until enemySys.n) if (enemySys.ex[i] > -1000f) currentActiveCount++
+                    
+                    // If enemies died in this step, count them as neutralized by EMP
+                    if (currentActiveCount < 4 - empNeutralizedCount) {
+                        empNeutralizedCount = 4 - currentActiveCount
+                    }
+                    
+                    // Also count spawners if they are fried
+                    val friedSpawners = gs.spawnerNodes.count { it.state == com.appsbyalok.echohunter.systems.SpawnState.DISABLED || it.state == com.appsbyalok.echohunter.systems.SpawnState.DESTROYED }
+                    
+                    val currentCount = empNeutralizedCount + friedSpawners
+                    currentCount >= 3
+                }
+                else -> false
             }
+
+            // --- AUTO-RESPAWN IF TARGET LOST ---
+            if (!isTrapped) {
+                if (trapTrial < 2) { // Camo or Decoy
+                    if (targetIndex == -1 || enemySys.ex[targetIndex] < -1000f) {
+                        // Reset messageStep to force re-spawning/re-briefing logic
+                        messageStep = -1 
+                    }
+                } else if (trapTrial == 2) { // EMP Swarm
+                    val aliveCount = (0 until enemySys.n).count { enemySys.ex[it] > -1000f }
+                    if (aliveCount == 0 && empNeutralizedCount < 3) {
+                         messageStep = -1 // Respawn swarm
+                    }
+                }
+            }
+
+            if (isTrapped) {
+                // For Camo/Decoy, we need to hold the condition for 1.5s
+                // EMP is an instant clear once hitCount >= 3 is met
+                val requiredTime = if (trapTrial == 2) 0.01f else 1.5f
+                
+                trapCounter += gs.lastDt
+                if (trapCounter >= requiredTime) {
+                    if (trapTrial == 2) {
+                        // Wipe the swarm
+                        for (i in 0 until enemySys.n) if (enemySys.ex[i] > -1000f) enemySys.killEnemy(i, gs)
+                    } else if (targetIndex != -1) {
+                        enemySys.killEnemy(targetIndex, gs)
+                    }
+                    
+                    trapTrial++
+                    trapCounter = 0f
+                    clearTarget(gs)
+                    gs.trapCooldownTimer = 0f
+                    EchoAudioManager.playSound(ToneGenerator.TONE_CDMA_PIP, 150)
+                }
+            } else {
+                trapCounter = (trapCounter - gs.lastDt * 0.5f).coerceAtLeast(0f)
+            }
+
+            // --- FORCE SITUATION LOGIC ---
+            if (trapTrial == 0 && targetIndex != -1) {
+                // Camo Target: Passive/Stationary
+                enemySys.evx[targetIndex] = 0f
+                enemySys.evy[targetIndex] = 0f
+                enemySys.eState[targetIndex] = 0
+            }
+            
             return
         }
 
@@ -206,21 +340,40 @@ class TrainingObjective : IGameObjective {
         gs.tutorialEnabledActions = emptySet()
         gs.objectiveLabel = "TRAINING COMPLETE"
         gs.objectiveProgress = 1f
-        if (messageStep != 1) {
+        if (!trainingCompleteTriggered) {
+            trainingCompleteTriggered = true
             SaveManager.setGameTutorialCompleted(true)
             StoryProtocol.showTypewriterMessage("TRAINING COMPLETE. ALL HUNTER SYSTEMS ARE AVAILABLE.", 4f)
-            messageStep = 1
         }
         if (phaseTimer >= 4f) gs.isLevelCleared = true
     }
 
-    private fun spawnTrainingTarget(gs: GameState, enemySys: EnemySystem, scale: Float): Int {
+    private fun spawnTrainingTarget(
+        gs: GameState, 
+        enemySys: EnemySystem, 
+        scale: Float, 
+        offsetX: Float = 0.65f, 
+        offsetY: Float = 0f,
+        type: Int = 0,
+        triggerCinematic: Boolean = false
+    ): Int {
         val index = (0 until enemySys.n).firstOrNull { enemySys.ex[it] < -1000f } ?: return -1
-        enemySys.spawnAt(index, gs.px + scale * 0.65f, gs.py, gs, scale, 0)
+        val tx = gs.px + scale * offsetX
+        val ty = gs.py + scale * offsetY
+        enemySys.spawnAt(index, tx, ty, gs, scale, type)
         if (enemySys.ex[index] > -1000f) {
             enemySys.hp[index] = 1
             enemySys.maxHp[index] = 1
             enemySys.vis[index] = 1f
+            
+            // Explicitly set behavior based on forced type
+            enemySys.type[index] = type
+            enemySys.enemyBrains[index] = if (type == 1) com.appsbyalok.echohunter.systems.HunterBehavior else com.appsbyalok.echohunter.systems.PatrolBehavior
+
+            if (triggerCinematic) {
+                // Use ACTUAL position after spawn validation
+                gs.triggerCinematicFocus(enemySys.ex[index], enemySys.ey[index], zoom = 1.35f, duration = 1.2f)
+            }
         }
         return index
     }
@@ -295,7 +448,9 @@ class TrainingObjective : IGameObjective {
         if (phase < 4) {
             clearTarget(gs)
             if (phase == 2) {
-                beginDarkMaze(gs, gs.tileSize)
+                // Calculate scale from tileSize (since tileSize = scale * 0.15)
+                val scale = gs.tileSize / 0.15f
+                beginDarkMaze(gs, scale)
             } else {
                 advancePhase()
             }
@@ -304,6 +459,7 @@ class TrainingObjective : IGameObjective {
     }
 
     fun skipAll(gs: GameState) {
+        if (phase >= 4) return
         clearTarget(gs)
         phase = 4
         phaseTimer = 0f

@@ -35,16 +35,27 @@ class LevelSimulationTest {
             // 1. Verify Objective Logic
             verifyObjectiveMapping(config.features, objective)
 
-            // 2. Map Validation
             val grid = MazeGenerator.generateLevelMap(level, gs.gameMode.id, gs.difficulty.id, level)
             gs.gridMap = grid
-            gs.tileSize = 100f
+            
+            val screenW = 1080f
+            val screenH = 2400f
+            val scale = 1080f
+            
+            gs.tileSize = scale * 0.15f
+            gs.mapWidth = grid.size * gs.tileSize
+            gs.mapHeight = grid[0].size * gs.tileSize
             
             val enemySys = com.appsbyalok.echohunter.systems.EnemySystem()
+            enemySys.respawnAll(gs)
             val effectSys = com.appsbyalok.echohunter.systems.EffectSystem()
             val spawnerSys = com.appsbyalok.echohunter.systems.SpawnerSystem(enemySys, effectSys)
             
-            objective.setupObjective(gs, enemySys, spawnerSys, 1080f, 1920f, 1.0f)
+            spawnerSys.generateNodes(gs, gs.mapWidth, gs.mapHeight, scale)
+            objective.setupObjective(gs, enemySys, spawnerSys, screenW, screenH, scale)
+            
+            verifyMapSize(level, gs.gameMode, gs.difficulty.id, grid)
+            identifySoftLock(gs, grid)
 
             // 3. Connectivity Test (BFS)
             assertTrue("L$level: No path from Spawn to Core", isPathPossible(grid))
@@ -83,7 +94,59 @@ class LevelSimulationTest {
             val grid = MazeGenerator.generateLevelMap(1, gs.gameMode.id, 0, 100, act)
             assertNotNull("Story Grid null for Act $act", grid)
             assertTrue("Story Act $act grid too small", grid.size > 20)
+            
+            verifyMapSize(1, gs.gameMode, 0, grid, act)
+            identifySoftLock(gs, grid)
         }
+    }
+
+    @Test
+    fun testIntMaxLevelStability() {
+        val gs = GameState()
+        gs.gameMode = GameModeId.CAMPAIGN
+        gs.currentLevel = Int.MAX_VALUE
+        gs.resetGame()
+
+        val grid = MazeGenerator.generateLevelMap(gs.currentLevel, gs.gameMode.id, 0, 999)
+        assertNotNull("INT_MAX Grid null", grid)
+        
+        val scale = 1080f
+        gs.tileSize = scale * 0.15f
+        gs.mapWidth = grid.size * gs.tileSize
+        gs.mapHeight = grid[0].size * gs.tileSize
+        
+        val enemySys = com.appsbyalok.echohunter.systems.EnemySystem()
+        enemySys.respawnAll(gs)
+        val effectSys = com.appsbyalok.echohunter.systems.EffectSystem()
+        val spawnerSys = com.appsbyalok.echohunter.systems.SpawnerSystem(enemySys, effectSys)
+        
+        spawnerSys.generateNodes(gs, gs.mapWidth, gs.mapHeight, scale)
+        gs.activeObjective.setupObjective(gs, enemySys, spawnerSys, 1080f, 2400f, scale)
+
+        verifyMapSize(gs.currentLevel, gs.gameMode, 0, grid)
+        identifySoftLock(gs, grid)
+    }
+
+    @Test
+    fun testTrainingObjectiveStability() {
+        val gs = GameState()
+        gs.gameMode = GameModeId.TRAINING
+        gs.resetGame()
+        
+        val grid = MazeGenerator.generateLevelMap(1, gs.gameMode.id, 0, 101)
+        gs.gridMap = grid
+        val scale = 1080f
+        gs.tileSize = scale * 0.15f
+        
+        val enemySys = com.appsbyalok.echohunter.systems.EnemySystem()
+        enemySys.respawnAll(gs)
+        val effectSys = com.appsbyalok.echohunter.systems.EffectSystem()
+        val spawnerSys = com.appsbyalok.echohunter.systems.SpawnerSystem(enemySys, effectSys)
+        
+        gs.activeObjective.setupObjective(gs, enemySys, spawnerSys, 1080f, 2400f, scale)
+        
+        assertTrue("Training must use TrainingObjective", gs.activeObjective is com.appsbyalok.echohunter.modes.TrainingObjective)
+        identifySoftLock(gs, grid)
     }
 
     private fun verifyObjectiveMapping(features: Set<LevelFeature>, objective: IGameObjective) {
@@ -94,6 +157,76 @@ class LevelSimulationTest {
             features.contains(LevelFeature.ELIMINATION) -> assertTrue(objective is EliminationObjective)
             features.contains(LevelFeature.CLEAN_SWEEP) -> assertTrue(objective is com.appsbyalok.echohunter.modes.CleanSweepObjective)
             else -> assertTrue(objective is StandardObjective)
+        }
+    }
+
+    private fun verifyMapSize(level: Int, gameMode: GameModeId, difficulty: Int, grid: Array<IntArray>, storyAct: Int = 0) {
+        val w = grid.size
+        val isHard = difficulty == 1
+        val maxAllowed = if (isHard) 251 else 151
+        
+        assertTrue("Map too small for level $level", w >= 21)
+        assertTrue("Map exceeds maximum constraints ($maxAllowed)", w <= maxAllowed + 1)
+        
+        // Identify if this level SHOULD have been a Quarantine layout
+        val features = LevelEngine.determineLevelFeatures(level)
+        val isQuarantine = features.contains(LevelFeature.DEFENSE) && 
+                !features.contains(LevelFeature.BOSS) && 
+                !features.contains(LevelFeature.ESCAPE) &&
+                !features.contains(LevelFeature.CLEAN_SWEEP) &&
+                !features.contains(LevelFeature.MAZE) &&
+                !features.contains(LevelFeature.ADMIN_BONUS)
+        
+        if (isQuarantine && gameMode == GameModeId.CAMPAIGN) {
+            assertTrue("Quarantine map for L$level should be compact (w=$w)", w <= 43)
+        }
+        
+        if (gameMode == GameModeId.STORY) {
+            val expectedMin = if (isHard) 151 else 101
+            assertTrue("Story map for Act $storyAct too small (w=$w)", w >= expectedMin)
+        }
+    }
+
+    private fun identifySoftLock(gs: GameState, grid: Array<IntArray>) {
+        val level = gs.currentLevel
+        val objective = gs.activeObjective
+        val features = LevelEngine.determineLevelFeatures(level)
+
+        // 1. Structural Check: Essential Nodes
+        var hasSpawn = false
+        var hasDest = false
+        for (x in grid.indices) {
+            for (y in grid[0].indices) {
+                if (grid[x][y] == MazeGenerator.PLAYER_SPAWN) hasSpawn = true
+                if (grid[x][y] == MazeGenerator.DEST_NODE) hasDest = true
+            }
+        }
+        assertTrue("L$level: Player Spawn missing", hasSpawn)
+        
+        // Standard objectives and Story usually need a DEST_NODE for core/portal
+        if (objective is StoryObjective || objective is EscapeObjective || objective is DefenseObjective) {
+            assertTrue("L$level: Destination Node missing for objective ${objective.javaClass.simpleName}", hasDest)
+        }
+
+        // 2. Reachability: DEST_NODE check
+        if (hasDest) {
+            assertTrue("L$level: Objective node unreachable from spawn", isPathPossible(grid))
+        }
+
+        // 3. Entity Check: Can objective be completed?
+        if (features.contains(LevelFeature.CLEAN_SWEEP)) {
+            // Must have at least some spawners to destroy
+            assertTrue("L$level: Clean Sweep requested but no spawners found", gs.spawnerNodes.isNotEmpty())
+        }
+
+        if (features.contains(LevelFeature.ELIMINATION)) {
+            // Ensure target count is initialized
+            assertTrue("L$level: Elimination target count not set", gs.elimTargetsRequired > 0)
+        }
+
+        // 4. Hybrid Logic: Verify no conflicting markers
+        if (features.contains(LevelFeature.DEFENSE) && features.contains(LevelFeature.ESCAPE)) {
+            assertTrue("Hybrid L$level: Core position must be valid", gs.coreX > 0 && gs.coreY > 0)
         }
     }
 

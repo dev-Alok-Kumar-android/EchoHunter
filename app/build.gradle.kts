@@ -9,11 +9,11 @@ android {
 
     defaultConfig {
         applicationId = "com.appsbyalok.echohunter"
-        minSdk = 21
+        minSdk = 16
         //noinspection OldTargetApi
         targetSdk = 36
-        versionCode = 27
-        versionName = "0.10.2"
+        versionCode = 28
+        versionName = "0.10.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

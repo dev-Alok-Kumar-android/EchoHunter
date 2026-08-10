@@ -299,7 +299,7 @@ class HUDRenderer(private val context: Context) {
                 val isCharging = gs.controls.currentWeapon == 2 && gs.controls.isSniperCharging
                 val color = if (isCharging) GameColors.YELLOW else if (gs.controls.attackRequested) GameColors.TEXT else GameColors.RED
                 drawActionButton(c, atkX, atkY, radius, "ATK", color, false, visualType = resolved.control.visualType)
-                drawDirectionalAimFeedback(c, scale, gs, atkX, atkY, radius, color, isCharging)
+                drawDirectionalAimFeedback(c, gs, atkX, atkY, radius, color, isCharging)
             }
             AttackMode.AUTO_AIM -> {
                 val isCharging = gs.controls.currentWeapon == 2 && gs.controls.isSniperCharging
@@ -357,7 +357,8 @@ class HUDRenderer(private val context: Context) {
         }
     }
 
-    private fun drawDirectionalAimFeedback(c: Canvas, scale: Float, gs: GameState, x: Float, y: Float, radius: Float, color: Int, isCharging: Boolean) {
+    private fun drawDirectionalAimFeedback(c: Canvas,
+                                           gs: GameState, x: Float, y: Float, radius: Float, color: Int, isCharging: Boolean) {
         val dx = gs.controls.aimDirX
         val dy = gs.controls.aimDirY
         p.style = Paint.Style.STROKE
@@ -575,7 +576,7 @@ class HUDRenderer(private val context: Context) {
             p.color = (intensity * 40).toInt() shl 24 or (GameColors.RED and 0xFFFFFF)
             
             // Random horizontal glitch bars
-            for (i in 0 until (intensity * 5).toInt() + 1) {
+            repeat((intensity * 5).toInt() + 1) {
                 val gy = (Math.random() * h).toFloat()
                 val gh = (Math.random() * scale * 0.05f).toFloat()
                 c.drawRect(0f, gy, w, gy + gh, p)

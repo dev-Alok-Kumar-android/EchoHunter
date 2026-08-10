@@ -86,6 +86,7 @@ class UIMainFrame {
         "THE FINAL STRIKE. EXECUTE SYSTEM ECLIPSE PROTOCOLS TO DESTROY THE AEGIS GLOBAL CORE PERMANENTLY."
     )
 
+    private val tempRect = RectF()
     private var hitOnDown = -1
     private var downX = 0f
     private var downY = 0f
@@ -189,7 +190,8 @@ class UIMainFrame {
                     p.color = GameColors.YELLOW
                     p.alpha = (255 * (1f - pulse)).toInt()
                     val expand = pulse * scale * 0.04f
-                    c.drawRoundRect(rect.left - expand, rect.top - expand, rect.right + expand, rect.bottom + expand, scale * 0.02f, scale * 0.02f, p)
+                    tempRect.set(rect.left - expand, rect.top - expand, rect.right + expand, rect.bottom + expand)
+                    c.drawRoundRect(tempRect, scale * 0.02f, scale * 0.02f, p)
                     p.alpha = 255
                 }
             } else if (i == 2) {

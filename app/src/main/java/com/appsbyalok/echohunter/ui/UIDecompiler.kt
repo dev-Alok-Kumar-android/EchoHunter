@@ -34,6 +34,7 @@ class UIDecompiler {
     private var expandedType: UpgradeType? = null
     private val buyButtons = mutableMapOf<UpgradeType, RectF>()
     private val cardRects = mutableMapOf<UpgradeType, RectF>()
+    private val tempRect = RectF()
     private var hitOnDown = -1
     private var hitTypeOnDown: UpgradeType? = null
     private var listTop = 0f
@@ -254,7 +255,8 @@ class UIDecompiler {
                     val pulse = (System.currentTimeMillis() % 1000) / 1000f
                     p.alpha = (255 * (1f - pulse)).toInt()
                     val pad = scale * 0.01f + pulse * scale * 0.02f
-                    c.drawRoundRect(btnRect.left - pad, btnRect.top - pad, btnRect.right + pad, btnRect.bottom + pad, scale * 0.01f, scale * 0.01f, p)
+                    tempRect.set(btnRect.left - pad, btnRect.top - pad, btnRect.right + pad, btnRect.bottom + pad)
+                    c.drawRoundRect(tempRect, scale * 0.01f, scale * 0.01f, p)
                     p.alpha = 255
                 }
 

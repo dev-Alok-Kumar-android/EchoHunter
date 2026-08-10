@@ -24,6 +24,7 @@ class EnemySystem {
         textAlign = Paint.Align.CENTER
     }
     private val entityPath = Path()
+    private val reusableRect = android.graphics.RectF()
 
     val ai = EnemyAI()
     private var heatTimer = 0f
@@ -83,7 +84,7 @@ class EnemySystem {
     }
 
     // Helper for Boss mechanics (Glitch Clones, etc.)
-    fun spawnBossClone(nx: Float, ny: Float, gs: GameState, scale: Float) {
+    fun spawnBossClone(nx: Float, ny: Float, scale: Float) {
         // Find an empty slot in the enemy arrays
         for (i in 0 until n) {
             if (vis[i] <= 0f) {
@@ -741,13 +742,13 @@ class EnemySystem {
             // DRAW SHADOW WHEN JUMPING
             if (gs.bossZ > 0) {
                 p.color = (bossAlpha / 2 shl 24) or 0x000000
-                c.drawOval(
+                reusableRect.set(
                     gs.bossX - gs.cameraX - bossRadius * 0.6f,
                     gs.bossY - gs.cameraY - bossRadius * 0.2f,
                     gs.bossX - gs.cameraX + bossRadius * 0.6f,
-                    gs.bossY - gs.cameraY + bossRadius * 0.2f,
-                    p
+                    gs.bossY - gs.cameraY + bossRadius * 0.2f
                 )
+                c.drawOval(reusableRect, p)
             }
 
             p.color = (bossAlpha shl 24) or (behavior.color and 0xFFFFFF)

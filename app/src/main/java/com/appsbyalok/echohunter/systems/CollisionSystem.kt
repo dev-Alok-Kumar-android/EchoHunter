@@ -467,8 +467,8 @@ class CollisionSystem(
                             
                             effectSystem.spawnParticles(enemySystem.ex[i], enemySystem.ey[i], 1, scale)
                             
-                            // Hunters die on shield hit, but Guards are tanky—just bounce back
-                            if (enemySystem.type[i] == 1) {
+                            // Hunters die on shield hit (except in Training), but Guards are tanky—just bounce back
+                            if (enemySystem.type[i] == 1 && gs.gameMode != GameModeId.TRAINING) {
                                 enemySystem.killEnemy(i, gs)
                             } else {
                                 // Guard Bounce
@@ -487,24 +487,28 @@ class CollisionSystem(
                     }
                 } else if (enemySystem.type[i] == 2) {
                     // --- KAMIKAZE/HACKER ---
-                    onScoreAdd((5 * UpgradeSystem.getRewardMultiplier()).toLong())
-                    gs.collectedDataKB += LevelEngine.getKillRewardKB(gs.currentLevel, isBoss = false)
-                    effectSystem.spawnParticles(enemySystem.ex[i], enemySystem.ey[i], 1, scale)
-                    if (!playedEnemyHackSound) {
-                        EchoAudioManager.playSound(ToneGenerator.TONE_PROP_ACK, 80)
-                        playedEnemyHackSound = true
+                    if (gs.gameMode != GameModeId.TRAINING) {
+                        onScoreAdd((5 * UpgradeSystem.getRewardMultiplier()).toLong())
+                        gs.collectedDataKB += LevelEngine.getKillRewardKB(gs.currentLevel, isBoss = false)
+                        effectSystem.spawnParticles(enemySystem.ex[i], enemySystem.ey[i], 1, scale)
+                        if (!playedEnemyHackSound) {
+                            EchoAudioManager.playSound(ToneGenerator.TONE_PROP_ACK, 80)
+                            playedEnemyHackSound = true
+                        }
+                        enemySystem.killEnemy(i, gs)
                     }
-                    enemySystem.killEnemy(i, gs)
                 } else if (enemySystem.type[i] == 0) {
                     // --- NORMAL YELLOW (PATROL) ---
-                    onScoreAdd((2 * UpgradeSystem.getRewardMultiplier()).toLong())
-                    gs.collectedDataKB += LevelEngine.getKillRewardKB(gs.currentLevel, isBoss = false)
-                    effectSystem.spawnParticles(enemySystem.ex[i], enemySystem.ey[i], 0, scale * 0.5f) // Small pulse effect
-                    if (!playedEnemyHackSound) {
-                        EchoAudioManager.playSound(ToneGenerator.TONE_PROP_ACK, 60)
-                        playedEnemyHackSound = true
+                    if (gs.gameMode != GameModeId.TRAINING) {
+                        onScoreAdd((2 * UpgradeSystem.getRewardMultiplier()).toLong())
+                        gs.collectedDataKB += LevelEngine.getKillRewardKB(gs.currentLevel, isBoss = false)
+                        effectSystem.spawnParticles(enemySystem.ex[i], enemySystem.ey[i], 0, scale * 0.5f) // Small pulse effect
+                        if (!playedEnemyHackSound) {
+                            EchoAudioManager.playSound(ToneGenerator.TONE_PROP_ACK, 60)
+                            playedEnemyHackSound = true
+                        }
+                        enemySystem.killEnemy(i, gs)
                     }
-                    enemySystem.killEnemy(i, gs)
                 } else if (enemySystem.type[i] == 6) {
                     // --- BOMBER COLLISION ---
                     // Bomber detonates on contact, creating a damaging explosion.

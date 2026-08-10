@@ -395,17 +395,19 @@ class SpawnerSystem(private val enemySys: EnemySystem, private val effectSys: Ef
     }
 
     private fun relocateNode(node: SpawnNode, gs: GameState, targetW: Float) {
-        for (attempt in 0 until 15) {
-            val angle = Random.nextFloat() * 6.2831855f
-            val dist = (targetW * 1.2f) + Random.nextFloat() * (targetW * 0.5f)
-            val tx = gs.px + kotlin.math.cos(angle) * dist
-            val ty = gs.py + kotlin.math.sin(angle) * dist
+        run search@{
+            repeat(15) {
+                val angle = Random.nextFloat() * 6.2831855f
+                val dist = (targetW * 1.2f) + Random.nextFloat() * (targetW * 0.5f)
+                val tx = gs.px + kotlin.math.cos(angle) * dist
+                val ty = gs.py + kotlin.math.sin(angle) * dist
 
-            if (SpawnValidator.isValid(tx, ty, gs.tileSize / 2f, gs) && 
-                SpawnValidator.isFarFromNodes(tx, ty, gs, gs.tileSize * 2f)) {
-                node.x = tx
-                node.y = ty
-                break
+                if (SpawnValidator.isValid(tx, ty, gs.tileSize / 2f, gs) && 
+                    SpawnValidator.isFarFromNodes(tx, ty, gs, gs.tileSize * 2f)) {
+                    node.x = tx
+                    node.y = ty
+                    return@search
+                }
             }
         }
     }

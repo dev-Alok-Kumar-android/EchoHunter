@@ -114,6 +114,10 @@ object StoryProtocol {
     }
 
     // --- Story Line Arrays ---
+    val trainingIntroLines = intArrayOf(
+        R.string.training_intro_1, R.string.training_intro_2, R.string.training_intro_3
+    )
+
     val storyIntroLines = intArrayOf(
         R.string.story_main_1, R.string.story_main_2,
         R.string.story_main_3, R.string.story_main_4

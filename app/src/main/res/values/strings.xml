@@ -66,4 +66,8 @@
     <string name="story_bad_1">&gt; CONNECTION LOST.</string>
     <string name="story_bad_2">&gt; DRONE DESTROYED.</string>
     <string name="story_bad_3">&gt; TRACE COMPLETED. THEY ARE COMING FOR YOU.</string>
+    <!-- Training Mode -->
+    <string name="training_intro_1">&gt; INITIATING NEURAL LINK TRAINING…</string>
+    <string name="training_intro_2">&gt; CALIBRATING VIRTUAL INTERFACE: NANO-OS 4.2…</string>
+    <string name="training_intro_3">&gt; UPLINK PROTECTED. SIMULATION START.</string>
 </resources>

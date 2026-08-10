@@ -254,31 +254,33 @@ class UITerminal {
         if (typewriterQueue.isNotEmpty() && now - lastTypeTime >= TYPE_DELAY) {
             val charsToProcess = ((now - lastTypeTime) / TYPE_DELAY).toInt().coerceAtMost(typewriterQueue.length)
             
-            for (i in 0 until charsToProcess) {
-                if (typewriterQueue.isEmpty()) break
-                val char = typewriterQueue[0]
-                typewriterQueue.deleteCharAt(0)
-                
-                if (char == '\n') {
-                    lines.add("")
-                    wrappedLines.add("")
-                } else {
-                    if (lines.isEmpty()) lines.add("")
-                    val lastRaw = lines.last()
-                    lines[lines.size - 1] = lastRaw + char
+            run charLoop@{
+                repeat(charsToProcess) {
+                    if (typewriterQueue.isEmpty()) return@charLoop
+                    val char = typewriterQueue[0]
+                    typewriterQueue.deleteCharAt(0)
                     
-                    if (maxTextWidth > 0f) {
-                        pText.textSize = lastScale * 0.03f
-                        if (wrappedLines.isEmpty()) wrappedLines.add("")
-                        val lastWrapped = wrappedLines.last()
-                        if (pText.measureText(lastWrapped + char) <= maxTextWidth) {
-                            wrappedLines[wrappedLines.size - 1] = lastWrapped + char
-                        } else {
-                            wrappedLines.add(char.toString())
-                        }
+                    if (char == '\n') {
+                        lines.add("")
+                        wrappedLines.add("")
                     } else {
-                        if (wrappedLines.isEmpty()) wrappedLines.add("")
-                        wrappedLines[wrappedLines.size - 1] = wrappedLines.last() + char
+                        if (lines.isEmpty()) lines.add("")
+                        val lastRaw = lines.last()
+                        lines[lines.size - 1] = lastRaw + char
+                        
+                        if (maxTextWidth > 0f) {
+                            pText.textSize = lastScale * 0.03f
+                            if (wrappedLines.isEmpty()) wrappedLines.add("")
+                            val lastWrapped = wrappedLines.last()
+                            if (pText.measureText(lastWrapped + char) <= maxTextWidth) {
+                                wrappedLines[wrappedLines.size - 1] = lastWrapped + char
+                            } else {
+                                wrappedLines.add(char.toString())
+                            }
+                        } else {
+                            if (wrappedLines.isEmpty()) wrappedLines.add("")
+                            wrappedLines[wrappedLines.size - 1] = wrappedLines.last() + char
+                        }
                     }
                 }
             }
